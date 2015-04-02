@@ -1,0 +1,25 @@
+{
+  "name": "jsmr",
+  "version": "0.0.0",
+  "description": "A browser based MapReduce implementation",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "MapReduce",
+    "JavaScript",
+    "Node.js",
+    "Distributed",
+    "Data",
+    "Analysis"
+  ],
+  "author": "Behrooz Afghahi, Sahil Mehta, Prasanna Deolankar, Shruthi Keerthi Balki",
+  "license": "BSD",
+  "dependencies": {
+    "restify": "~3.0.1",
+    "sqlite3": "~3.0.5",
+    "sequelize": "~2.0.5",
+    "nconf": "~0.7.1"
+  }
+}
