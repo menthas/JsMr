@@ -31,6 +31,9 @@ server.get('/admin/dashboard', function (req, res, next) {
          });
 });
 
+/**
+ * Returns a list of clients for the DataTable plugin
+ */
 server.get('/admin/clients', function (req, res, next) {
     var chain = new Sequelize.Utils.QueryChainer();
     var find_params = {
@@ -72,6 +75,9 @@ server.get('/admin/clients', function (req, res, next) {
          });
 });
 
+/**
+ * Returns a list of jobs for the DataTable plugin
+ */
 server.get('/admin/jobs', function (req, res, next) {
     var chain = new Sequelize.Utils.QueryChainer();
     var find_params = {
