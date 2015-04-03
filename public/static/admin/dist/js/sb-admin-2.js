@@ -59,9 +59,33 @@ function load_dashboard() {
         if (result.error) {
             $('#dashboard-alert').fadeIn();
         } else {
+            var server_from = new Date();
+            server_from.setSeconds(server_from.getSeconds() - result.uptime);
+            var avg_time = Math.round(result.avg_uptime * 100) / 100;
+            if (avg_time > 10)
+                avg_time = Math.round(avg_time);
             $('#dashboard-client-count').html(result.clients);
             $('#dashboard-job-count').html(result.jobs);
+            $('#dashboard-avg-time').html(format_time(avg_time));
+            $('#dashboard-total-clients').html(result.total_clients);
+            $('#dashboard-uptime').html(format_time(result.uptime));
+            $('#dashboard-server-from').html(server_from.toDateString());
         }
         $('#page-dashboard').slideDown();
     }, 'json');
+}
+
+function format_time(seconds) {
+    var f = "";
+    if (seconds > 3600) {
+        var hours = Math.floor(seconds / 3600);
+        seconds -= hours * 3600;
+        f += hours + "h ";
+    }
+    if (seconds > 60) {
+        var minutes = Math.floor(seconds / 60);
+        seconds -= minutes * 60;
+        f += minutes + "m ";
+    }
+    return f + seconds + "s";
 }

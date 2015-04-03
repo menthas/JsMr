@@ -71,6 +71,7 @@ var JsMr = Class.extend({
         this.client_id = null;
         this.last_call = 0;
         this.current_task = null;
+        this.beat_interval_obj = null;
         this.options = {
             beat_interval: 60000, // one minute
             auth_token: null,
@@ -102,7 +103,7 @@ var JsMr = Class.extend({
                     self.registered = true;
                     self.client_id = data.client_id;
                     self.runTask(data.task);
-                    setInterval(function () {
+                    self.beat_interval_obj = setInterval(function () {
                         self.beat();
                     }, self.options.beat_interval);
                     self.log("Client Registered with id " + data.client_id);
@@ -114,6 +115,34 @@ var JsMr = Class.extend({
             self.log("Failed to contact server at " + self.url('register'), true);
         });
         self.serverCalled();
+    },
+
+    /**
+     * Unregister the client from the server and stop any activity by the SDK
+     */
+    unregister: function() {
+        if (!this.registered)
+            return;
+        var _this = this;
+        jQuery.post(
+            this.url('register'),
+            {
+                auth_token: this.options.auth_token,
+                client_id: this.client_id,
+                action: 'unregister',
+            },
+            function (data) {
+                // TODO maybe stop the running task ?
+                if (data.unregistered == true) {
+                    _this.registered = false;
+                    _this.client_id = null;
+                    clearInterval(_this.beat_interval_obj);
+                    _this.log("Client removed from server pool.");
+                } else {
+                    _this.log("Failed to unregister client from server.", true);
+                }
+            }
+        );
     },
 
     /**

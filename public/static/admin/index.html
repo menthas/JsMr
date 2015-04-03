@@ -87,7 +87,7 @@
             </div>
             <!-- /.row -->
             <div class="row">
-                <div class="col-md-6">
+                <div class="col-lg-3 col-md-6">
                     <div class="panel panel-primary">
                         <div class="panel-heading">
                             <div class="row">
@@ -109,7 +109,7 @@
                         </a>
                     </div>
                 </div>
-                <div class="col-md-6">
+                <div class="col-lg-3 col-md-6">
                     <div class="panel panel-green">
                         <div class="panel-heading">
                             <div class="row">
@@ -129,6 +129,48 @@
                                 <div class="clearfix"></div>
                             </div>
                         </a>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="panel panel-yellow">
+                        <div class="panel-heading">
+                            <div class="row">
+                                <div class="col-xs-3">
+                                    <i class="fa fa-clock-o fa-5x"></i>
+                                </div>
+                                <div class="col-xs-9 text-right">
+                                    <div class="huge" id="dashboard-avg-time">0</div>
+                                    <div>Average Client Uptime</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="panel-footer">
+                            <span class="pull-left">
+                                From a total of <span id="dashboard-total-clients"></span> clients.
+                            </span>
+                            <div class="clearfix"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="panel panel-red">
+                        <div class="panel-heading">
+                            <div class="row">
+                                <div class="col-xs-3">
+                                    <i class="fa fa-history fa-5x"></i>
+                                </div>
+                                <div class="col-xs-9 text-right">
+                                    <div class="huge" id="dashboard-uptime">0</div>
+                                    <div>Server Uptime</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="panel-footer">
+                            <span class="pull-left">
+                                From <span id="dashboard-server-from"></span>
+                            </span>
+                            <div class="clearfix"></div>
+                        </div>
                     </div>
                 </div>
             </div>

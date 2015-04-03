@@ -1,5 +1,7 @@
+var commons = require('../lib/commons.js');
 var server = module.parent.exports.server;
 var storage = module.parent.exports.storage;
+var runtime = module.parent.exports.runtime;
 
 /**
  * (Un)Register a client
@@ -7,6 +9,7 @@ var storage = module.parent.exports.storage;
 server.post('/register', function registerHandler(req, res, next) {
     /**
      * @param  {string} auth_token   client auth token used to stablish a valid client
+     * @param  {string} client_id    only present for unregister
      * @param  {string} action       register|unregister
      * @param  {string} agent        Browser agent identifier
      * @return {
@@ -38,8 +41,22 @@ server.post('/register', function registerHandler(req, res, next) {
             });
             next();
         });
-    } else { // unregister client
-        next();
+    } else if (req.params.action == 'unregister') { // unregister client
+        storage.Client.find(req.params.client_id).then(function (client) {
+            if (client != null) {
+                commons.removeClient(client, runtime).then(function () {
+                        res.json({
+                            unregistered: true
+                        });
+                        next();
+                });
+            } else {
+                res.json({
+                    unregistered: true
+                });
+                next();
+            }
+        })
     }
 });
 

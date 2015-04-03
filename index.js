@@ -2,6 +2,13 @@
 var nconf = require('./config');
 module.exports.conf = nconf;
 
+// Holds runtime stats, no need to persist these
+module.exports.runtime = {
+    client_count: 0,
+    total_client_uptime: 0,
+    uptime: new Date()
+}
+
 // Create and Configure the server
 var restify = require('restify'),
     os = require('os');

@@ -1,7 +1,9 @@
 var server = module.parent.exports.server;
 var storage = module.parent.exports.storage;
 var conf = module.parent.exports.conf;
+var runtime = module.parent.exports.runtime;
 var utils = require("../lib/utils.js")(conf);
+var commons = require("../lib/commons.js");
 
 /**
  * Setup a cleanup task to do the following:
@@ -25,8 +27,7 @@ setInterval(function() {
             return;
         utils.log("Found " + clients.length + " inactive clients. removing ...");
         for (var i=0; i<clients.length; i++) {
-            // TODO remove active tasks, etc.
-            clients[i].destroy();
+            commons.removeClient(clients[i], runtime);
         }
     });
     // DONE with inactive clients
