@@ -31,6 +31,10 @@ body {
     margin-right: 0;
 }
 
+.navbar-top-links .reload-bar {
+    margin: 15px 10px 0 0;
+}
+
 .navbar-top-links li {
     display: inline-block;
 }

@@ -1,11 +1,18 @@
 var current_section = "dashboard";
+var dashboard, clients, jobs;
 
 //Loads the correct sidebar on window load,
 //collapses the sidebar on window resize.
 // Sets the min-height of .page-wrapper to window size
 $(function() {
+    dashboard = $('#page-dashboard');
+    clients = $('#page-clients');
+    jobs = $('#page-jobs');
+    clients.hide().data("loaded", false);
+    jobs.hide().data("loaded", false);
     $('.alert').hide();
     $('#side-menu').metisMenu();
+
     $(window).bind("load resize", function() {
         topOffset = 50;
         width = (this.window.innerWidth > 0) ? this.window.innerWidth : this.screen.width;
@@ -24,25 +31,19 @@ $(function() {
         }
     });
 
-    var url = window.location;
-    var element = $('ul.nav a').filter(function() {
-        return this.href == url || url.href.indexOf(this.href) == 0;
-    }).addClass('active').parent().parent().addClass('in').parent();
-    if (element.is('li')) {
-        element.addClass('active');
-    }
-
     $(".main-nav").click(function () {
         var section = $(this).data("section");
         if (current_section == section)
             return false;
         $('#page-' + current_section).slideUp();
         load_page(section);
+        current_section = section;
     });
 
     // load dashboard and reload content every 5 seconds
     load_page(current_section);
-    setInterval(function () { load_page(current_section) }, 5000);
+    setInterval(function () { load_page(current_section); }, 20000);
+    $('#reload-btn').click(function() { load_page(current_section); });
 });
 
 function load_page(section) {
@@ -71,8 +72,38 @@ function load_dashboard() {
             $('#dashboard-uptime').html(format_time(result.uptime));
             $('#dashboard-server-from').html(server_from.toDateString());
         }
-        $('#page-dashboard').slideDown();
+        dashboard.slideDown();
     }, 'json');
+}
+
+function load_clients() {
+    if (!clients.data("loaded")) {
+        var table = $('#clients-table').dataTable({
+            serverSide: true,
+            ajax: "/admin/clients",
+            ordering: false,
+        });
+        clients.data('loaded', true);
+        clients.data('table', table);
+    } else {
+        clients.data('table').api().ajax.reload(null, false);
+    }
+    clients.slideDown();
+}
+
+function load_jobs() {
+    if (!jobs.data("loaded")) {
+        var table = $('#jobs-table').dataTable({
+            serverSide: true,
+            ajax: "/admin/jobs",
+            ordering: false,
+        });
+        jobs.data('loaded', true);
+        jobs.data('table', table);
+    } else {
+        jobs.data('table').api().ajax.reload(null, false);
+    }
+    jobs.slideDown();
 }
 
 function format_time(seconds) {

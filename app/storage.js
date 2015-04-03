@@ -56,7 +56,11 @@ var Job = sequelize.define('job', {
         defaultValue: Sequelize.UUIDV4,
         primaryKey: true,
     },
-    name: Sequelize.STRING
+    name: Sequelize.STRING,
+    input_file: Sequelize.STRING,
+    output_dir: Sequelize.STRING,
+    completed: Sequelize.BOOLEAN,
+    paused: Sequelize.BOOLEAN,
 });
 
 /**
