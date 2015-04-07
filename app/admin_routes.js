@@ -1,5 +1,8 @@
 Sequelize = require('sequelize');
 var utils = require('../lib/utils.js')();
+var jobf = require('../lib/job.js');
+var fs = require('fs');
+var syntax_check = require('syntax-error');
 
 var server = module.parent.exports.server;
 var storage = module.parent.exports.storage;
@@ -69,9 +72,11 @@ server.get('/admin/clients', function (req, res, next) {
                 recordsFiltered: result[0],
                 data: result[1] ? result[1].map(client_to_array) : []
             });
+            next();
          })
          .error(function() {
              res.json({error:"Failed to retrieve client list at this time."});
+             next();
          });
 });
 
@@ -95,12 +100,12 @@ server.get('/admin/jobs', function (req, res, next) {
     var find = storage.Job.findAll(find_params);
     var job_to_array = function (job) {
         return [
-            client.id,
-            client.name ? client.name : "N/A",
-            client.completed ? "Yes" : "No",
-            client.paused ? "Yes" : "No",
-            client.input_file,
-            client.output_dir,
+            job.id,
+            job.name ? job.name : "N/A",
+            job.completed ? "Yes" : "No",
+            job.paused ? "Yes" : "No",
+            job.input_file,
+            job.output_dir,
         ];
     };
     chain.add(storage.Job.count())
@@ -113,8 +118,65 @@ server.get('/admin/jobs', function (req, res, next) {
                 recordsFiltered: result[0],
                 data: result[1] ? result[1].map(job_to_array) : []
             });
+            next();
          })
          .error(function() {
              res.json({error:"Failed to retrieve job list at this time."});
+             next();
          });
+});
+
+/**
+ * Create a new job from a .js file and the job attributes.
+ */
+server.post('/admin/job', function (req, res, next) {
+    try {
+        var err = syntax_check(fs.readFileSync(req.files.job_file.path));
+        if (err) // make sure the code is syntax error free
+            throw err;
+        // TODO validate params and job file
+        var job = require(req.files.job_file.path);
+        var input = job.input;
+        if (req.params.s3_input) {
+            var parts = req.params.s3_input.split(":");
+            if (parts.length != 2) {
+                res.json({
+                    error: "invalid S3 input"
+                })
+                next();
+                return;
+            }
+            input = {
+                type: 'AWS',
+                bucket: parts[0],
+                key: parts[1]
+            }
+        }
+        var output = job.output;
+        if (req.params.s3_output) {
+            output = {
+                type: 'AWS',
+                bucket: req.params.s3_output
+            }
+        }
+        var db_params = {
+            input: input,
+            output: output,
+            paused: req.params.unpause != '1',
+            name: req.params.job_name ? req.params.job_name : "JsMr Job"
+        }
+        // add the job and possibly schedule it.
+        jobf.add(
+            req.files.job_file.path, job, db_params, storage
+        );
+        res.json({
+            error:false
+        });
+        next();
+    } catch (err) {
+        res.json({
+            error: "Can't load the Job file: " + err
+        });
+        next();
+    }
 });

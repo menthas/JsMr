@@ -223,6 +223,7 @@
                     </div>
                 </div>
             </div>
+            <!-- /.row -->
         </div>
         <!-- /.page-wrapper -->
 
@@ -260,6 +261,63 @@
                     </div>
                 </div>
             </div>
+            <!-- /.row -->
+            <div class="row">
+                <div class="col-md-6 col-sm-6">
+                    <div class="panel panel-default">
+                        <div class="panel-heading">
+                            Create a new job
+                        </div>
+                        <!-- /.panel-heading -->
+                        <div class="panel-body">
+                            <form id="new_job_form" role="form" enctype="multipart/form-data">
+                                <div class="form-group">
+                                    <label>Name of this job</label>
+                                    <input type="text" class="form-control" name="job_name">
+                                    <p class="help-block">A name to easily identify this job.</p>
+                                </div>
+                                <div class="form-group">
+                                    <label>Job file (*.js)</label>
+                                    <input type="file" class="form-control" name="job_file" accept="text/javascript">
+                                    <p class="help-block">JavaScript file containing job code and configuration.</p>
+                                </div>
+                                <div class="form-group">
+                                    <label>Scheduling</label>
+                                    <div class="checkbox">
+                                        <label>
+                                            <input type="checkbox" name="unpause" value="1">
+                                            Start immediately
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>S3 input file</label>
+                                    <input type="text" class="form-control" name="s3_input" placeholder="Bucket:Key">
+                                    <p class="help-block">If provided, will override the value in job file</p>
+                                </div>
+                                <div class="form-group">
+                                    <label>S3 output directory</label>
+                                    <input type="text" class="form-control" name="s3_output" placeholder="Bucket">
+                                    <p class="help-block">If provided, will override the value in job file</p>
+                                </div>
+                                <button type="submit" class="btn btn-success">Submit Job</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-sm-6">
+                    <div class="panel panel-default">
+                        <div class="panel-heading">
+                            Job creation log
+                        </div>
+                        <!-- /.panel-heading -->
+                        <div class="panel-body">
+                            <pre id="new_job_console"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- /.row -->
         </div>
         <!-- /.page-wrapper -->
 

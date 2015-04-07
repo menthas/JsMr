@@ -44,6 +44,25 @@ $(function() {
     load_page(current_section);
     setInterval(function () { load_page(current_section); }, 20000);
     $('#reload-btn').click(function() { load_page(current_section); });
+
+    $('#new_job_form').submit(function(event) {
+        event.preventDefault();
+        $.ajax({
+            url: "/admin/job",
+            type: "POST",
+            data: new FormData(this),
+            contentType: false,
+            cache: false,
+            processData:false,
+            success: function(data)   // A function to be called if request succeeds
+            {
+                if (data.error == false) {
+                    data.error = "Job created successfuly. Check the status above.";
+                }
+                $('#new_job_console').html(data.error);
+            }
+        });
+    })
 });
 
 function load_page(section) {

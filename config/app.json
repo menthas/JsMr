@@ -4,5 +4,6 @@
     "debug": true,
     "sqlite_storage": ":memory:",
     "cleanup_task_interval": 20000,
-    "client_timeout": 65
+    "client_timeout": 65,
+    "default_split_size": 65536
 }

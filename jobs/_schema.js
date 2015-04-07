@@ -16,15 +16,21 @@ var m1 = function () {
 
     /**
      * Called on initialization of each instnace of this step
+     * WARNING: Never use variables from the outer scopes in this method, instead
+     *          use context.state to store any information.
+     * 
      * @param  {Object} context context of this step
      * @return {void}
      */
-    this.startup = function (context) {
+    this.setup = function (context) {
         // stub
     };
 
     /**
      * Called per record of the input
+     * WARNING: Never use variables from the outer scopes in this method, instead
+     *          use context.state to store any information.
+     * 
      * @param  {string}              key     key of the input record
      * @param  {string|list[string]} value   value (or list of values) of the input record,
      * @param  {Object}              context context of this step of the chain
@@ -35,21 +41,15 @@ var m1 = function () {
     };
 
     /**
-     * called once per instance of this step after all input is seen.
-     * @param  {Object} context context of this step
-     * @return {void}
-     */
-    this.cleanupInstnace = function (context) {
-        // stub
-    };
-
-    /**
      * called once for this step, gets the state of all instances.
+     * WARNING: Never use variables from the outer scopes in this method, instead
+     *          use context.state to store any information.
+     * 
      * @param  {list[Object]} states  list of states of all instances
      * @param  {Object}       context context of this step
      * @return {void}
      */
-    this.cleanupState = function (states, context) {
+    this.cleanup = function (states, context) {
         // stub
     };
 }
@@ -81,7 +81,6 @@ module.exports = {
 
         // for AWS:
         bucket: 'bucket_name',
-        key: 'dir_key',
     },
     options: { // this will be available in the context
         _sys_option: 'sys_value', // _sys_ options are reserved for the framework.

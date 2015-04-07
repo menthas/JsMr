@@ -4,6 +4,21 @@ var storage = module.parent.exports.storage;
 var runtime = module.parent.exports.runtime;
 
 /**
+ * A task response is:
+ *  + instance_id
+ *  + stage
+ *  + job_id
+ *  + task_id
+ *  + start_index
+ *  + end_index
+ *  + bucket_name
+ *  + object_key
+ *  + access_key
+ *  + secret_key
+ *  + config
+ */
+
+/**
  * (Un)Register a client
  */
 server.post('/register', function registerHandler(req, res, next) {
@@ -144,5 +159,21 @@ server.get('/chunk', function chunkGetHandler(req, res, next) {
      * @return {
      *         task: null|Task
      * }
+     */
+});
+
+/**
+ * Get the code for a job's stage (mapper/reducer in stage `i`).
+ * NOTE: the result is a JSONP string which means it will add a function with
+ *       the name `callback` when loaded on the client side.
+ */
+server.get('/code', function codeGetHandler(req, res, next) {
+    /**
+     * @param  {string}  auth_token
+     * @param  {string}  client_id
+     * @param  {string}  job_id
+     * @param  {integer} stage
+     * @param  {string}  callback
+     * @return bulk of code to run
      */
 });
