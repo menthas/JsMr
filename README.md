@@ -1,6 +1,17 @@
 # Browser-based MapReduce Framework
 This project is an attempt to create a distributed MapReduce framework using JavaScript. This framework will let you run MapReduce jobs on clients browsers and on dedicated servers (future work).
 
+### Using AWS
+To use AWS S3 for file transfer, you need to create a file called `aws.json` in the `config` folder with following content.
+```json
+{
+    "accessKeyId": "access_key",
+    "secretAccessKey": "secret",
+    "region": "us-west-2"
+}
+
+```
+
 ### Project Strucutere
 ```
 .
