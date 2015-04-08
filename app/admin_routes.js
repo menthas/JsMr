@@ -1,4 +1,4 @@
-Sequelize = require('sequelize');
+var Sequelize = require('sequelize');
 var utils = require('../lib/utils.js')();
 var jobf = require('../lib/job.js');
 var fs = require('fs');

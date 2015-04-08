@@ -72,11 +72,13 @@ var Task = sequelize.define('task', {
         defaultValue: Sequelize.UUIDV4,
         primaryKey: true,
     },
-    // job_id: Sequelize.UUID,
     failed: Sequelize.INTEGER.UNSIGNED,
     attempts: Sequelize.INTEGER.UNSIGNED,
     replicates: Sequelize.INTEGER.UNSIGNED,
-    completed: Sequelize.INTEGER.UNSIGNED
+    taken: Sequelize.INTEGER.UNSIGNED,
+    input_file: Sequelize.STRING,
+    input_offset: Sequelize.STRING,
+    input_size: Sequelize.INTEGER,
 });
 
 // Module relationships
