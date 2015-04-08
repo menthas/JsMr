@@ -57,10 +57,12 @@ var Job = sequelize.define('job', {
         primaryKey: true,
     },
     name: Sequelize.STRING,
+    current_step: Sequelize.INTEGER(2).UNSIGNED,
     input_file: Sequelize.STRING,
     output_dir: Sequelize.STRING,
     completed: Sequelize.BOOLEAN,
     paused: Sequelize.BOOLEAN,
+    error: Sequelize.STRING,
 });
 
 /**
@@ -72,13 +74,16 @@ var Task = sequelize.define('task', {
         defaultValue: Sequelize.UUIDV4,
         primaryKey: true,
     },
-    failed: Sequelize.INTEGER.UNSIGNED,
-    attempts: Sequelize.INTEGER.UNSIGNED,
-    replicates: Sequelize.INTEGER.UNSIGNED,
-    taken: Sequelize.INTEGER.UNSIGNED,
+    step: Sequelize.INTEGER(2).UNSIGNED,
+    failed: Sequelize.INTEGER(4).UNSIGNED,
+    attempts: Sequelize.INTEGER(4).UNSIGNED,
+    replicates: Sequelize.INTEGER(2).UNSIGNED,
+    taken: Sequelize.INTEGER(2).UNSIGNED,
     input_file: Sequelize.STRING,
     input_offset: Sequelize.STRING,
     input_size: Sequelize.INTEGER,
+    instance: Sequelize.INTEGER(4),
+    sort: Sequelize.BOOLEAN,
 });
 
 // Module relationships

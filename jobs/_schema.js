@@ -12,7 +12,7 @@ var m1 = function () {
      * -1 would mean as many as split chunks.
      * @type {Number}
      */
-    this.instances = 1;
+    this.instances = 5;
 
     /**
      * Called on initialization of each instnace of this step
@@ -52,10 +52,18 @@ var m1 = function () {
     this.cleanup = function (states, context) {
         // stub
     };
+
+    // Return the instance so it can be used by the framework
+    return this;
 }
 
 var m2 = function () {
     // Another step definition as outlined above
+    
+    this.is_reduce = false;
+    this.instances = -1;
+
+    return this;
 };
 
 /**

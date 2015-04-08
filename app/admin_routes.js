@@ -1,12 +1,15 @@
 var Sequelize = require('sequelize');
-var utils = require('../lib/utils.js')();
-var jobf = require('../lib/job.js');
 var fs = require('fs');
 var syntax_check = require('syntax-error');
+
+var utils = require('../lib/utils.js')();
+var jobf = require('../lib/job.js');
+var commons = require('../lib/commons.js');
 
 var server = module.parent.exports.server;
 var storage = module.parent.exports.storage;
 var runtime = module.parent.exports.runtime;
+var conf = module.parent.exports.conf;
 
 /**
  * Returns information used for the admin dashboard page.
@@ -104,6 +107,8 @@ server.get('/admin/jobs', function (req, res, next) {
             job.name ? job.name : "N/A",
             job.completed ? "Yes" : "No",
             job.paused ? "Yes" : "No",
+            job.current_step + 1,
+            job.error ? job.error : "None",
             job.input_file,
             job.output_dir,
         ];
@@ -130,53 +135,85 @@ server.get('/admin/jobs', function (req, res, next) {
  * Create a new job from a .js file and the job attributes.
  */
 server.post('/admin/job', function (req, res, next) {
-    try {
-        var err = syntax_check(fs.readFileSync(req.files.job_file.path));
-        if (err) // make sure the code is syntax error free
-            throw err;
-        // TODO validate params and job file
-        var job = require(req.files.job_file.path);
-        var input = job.input;
-        if (req.params.s3_input) {
-            var parts = req.params.s3_input.split(":");
-            if (parts.length != 2) {
-                res.json({
-                    error: "invalid S3 input"
-                })
-                next();
-                return;
-            }
-            input = {
-                type: 'AWS',
-                bucket: parts[0],
-                key: parts[1]
-            }
-        }
-        var output = job.output;
-        if (req.params.s3_output) {
-            output = {
-                type: 'AWS',
-                bucket: req.params.s3_output
-            }
-        }
-        var db_params = {
-            input: input,
-            output: output,
-            paused: req.params.unpause != '1',
-            name: req.params.job_name ? req.params.job_name : "JsMr Job"
-        }
-        // add the job and possibly schedule it.
-        jobf.add(
-            req.files.job_file.path, job, db_params, storage
-        );
-        res.json({
-            error:false
-        });
-        next();
-    } catch (err) {
+    var err = syntax_check(fs.readFileSync(req.files.job_file.path));
+    if (err) { // make sure the code is syntax error free
         res.json({
             error: "Can't load the Job file: " + err
         });
-        next();
+        return next();
     }
+
+    var job = require(req.files.job_file.path);
+
+    var err = _validateJob(job);
+    if (err) {
+        res.json({
+            error: err
+        });
+        return next();
+    }
+
+    var input = job.input;
+    if (req.params.s3_input) {
+        var parts = req.params.s3_input.split(":");
+        if (parts.length != 2) {
+            res.json({
+                error: "invalid S3 input"
+            })
+            next();
+            return;
+        }
+        input = {
+            type: 'AWS',
+            bucket: parts[0],
+            key: parts[1]
+        }
+    }
+    var output = job.output;
+    if (req.params.s3_output) {
+        output = {
+            type: 'AWS',
+            bucket: req.params.s3_output
+        }
+    }
+    var db_params = {
+        input: input,
+        output: output,
+        paused: req.params.unpause != '1',
+        name: req.params.job_name ? req.params.job_name : "JsMr Job"
+    }
+    // add the job and possibly schedule it.
+    jobf.add(
+        req.files.job_file.path, job, db_params, storage, conf
+    );
+    res.json({
+        error:false
+    });
+    next();
 });
+
+/**
+ * Validate a 
+ * @param  {Object}  job  The executed job file
+ * @return {String|undefined}  A string with an error message or undefined if
+ *         job is valid.
+ */
+function _validateJob(job) {
+    if (job.chain.length == 0) {
+        return "The specified job doen't include any map/reduce steps.";
+    } else {
+        for (var i=0; i<job.chain.length; i++) {
+            if (typeof job.chain[i] !== 'function') {
+                return "Map/Reduce at step "+(i+1)+" is not a valid function.";
+            } else {
+                try {
+                    var step = job.chain[i]();
+                    if (typeof step.instances !== 'number' || step.instances == 0)
+                        return "Map/Reduce at step "+(i+1)+" doesn't have a valid number of instances";
+                } catch (err) {
+                    return "Map/Reduce at step "+(i+1)+" can't be called.\nError" + err;
+                }
+            }
+        }
+    }
+}
