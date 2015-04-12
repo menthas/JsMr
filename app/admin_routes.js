@@ -29,12 +29,11 @@ server.get('/admin/dashboard', function (req, res, next) {
                 'total_clients': runtime.client_count,
                 'uptime': Math.floor((new Date() - runtime.uptime) / 1000)
             });
-            next();
          })
          .error(function () {
             res.json({error:true});
-            next();
          });
+    return next();
 });
 
 /**
@@ -75,12 +74,11 @@ server.get('/admin/clients', function (req, res, next) {
                 recordsFiltered: result[0],
                 data: result[1] ? result[1].map(client_to_array) : []
             });
-            next();
          })
          .error(function() {
              res.json({error:"Failed to retrieve client list at this time."});
-             next();
          });
+    return next();
 });
 
 /**
@@ -123,12 +121,11 @@ server.get('/admin/jobs', function (req, res, next) {
                 recordsFiltered: result[0],
                 data: result[1] ? result[1].map(job_to_array) : []
             });
-            next();
          })
          .error(function() {
              res.json({error:"Failed to retrieve job list at this time."});
-             next();
          });
+    return next();
 });
 
 /**
@@ -160,8 +157,7 @@ server.post('/admin/job', function (req, res, next) {
             res.json({
                 error: "invalid S3 input"
             })
-            next();
-            return;
+            return next();
         }
         input = {
             type: 'AWS',
@@ -189,7 +185,7 @@ server.post('/admin/job', function (req, res, next) {
     res.json({
         error:false
     });
-    next();
+    return next();
 });
 
 /**

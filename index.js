@@ -13,7 +13,12 @@ module.exports.runtime = {
 var restify = require('restify'),
     os = require('os');
 var server = restify.createServer({
-    name: 'JsMr'
+    name: 'JsMr',
+    formatters: {
+        'application/javascript': function(req, res, body) {
+            return body;
+        }
+    }
 });
 
 server.use(restify.acceptParser(server.acceptable));

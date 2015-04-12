@@ -1,3 +1,6 @@
+var fs = require('fs');
+var path = require('path');
+
 var commons = require('../lib/commons.js');
 var server = module.parent.exports.server;
 var storage = module.parent.exports.storage;
@@ -13,6 +16,7 @@ var runtime = module.parent.exports.runtime;
  *  + end_index
  *  + bucket_name
  *  + object_key
+ *  + output_bucket_name
  *  + access_key
  *  + secret_key
  *  + config
@@ -49,12 +53,10 @@ server.post('/register', function registerHandler(req, res, next) {
                 client_id: new_user.id,
                 task: null
             });
-            next();
         }).catch(function (error) {
             res.json({
                 registered: false,
             });
-            next();
         });
     } else if (req.params.action == 'unregister') { // unregister client
         storage.Client.find(req.params.client_id).then(function (client) {
@@ -63,16 +65,15 @@ server.post('/register', function registerHandler(req, res, next) {
                         res.json({
                             unregistered: true
                         });
-                        next();
                 });
             } else {
                 res.json({
                     unregistered: true
                 });
-                next();
             }
         })
     }
+    return next();
 });
 
 /**
@@ -108,8 +109,8 @@ server.get('/beat', function beatHandler(req, res, next) {
             client.last_activity = new Date();
             client.save();
         }
-        next();
     });
+    return next();
 });
 
 /**
@@ -173,7 +174,29 @@ server.get('/code', function codeGetHandler(req, res, next) {
      * @param  {string}  client_id
      * @param  {string}  job_id
      * @param  {integer} stage
-     * @param  {string}  callback
+     * @param  {string}  return_func
      * @return bulk of code to run
      */
+    storage.Client.find({
+        where: {
+            auth_token: req.params.auth_token,
+            id: req.params.client_id
+        }
+    }).then(function (client) {
+        if (!client)
+            return res.send(404, "Client not found");
+        var job_id = req.params.job_id.replace(/[^0-9a-z-]+/g, '');
+        var job_file = path.normalize(__dirname+'/../jobs/'+job_id+'.job')
+        if (fs.existsSync(job_file)) {
+            try {
+                job_info = require(job_file);
+                job_function = job_info.chain[parseInt(req.params.stage)].toString();
+                res.contentType = 'application/javascript';
+                return res.send(200, "var " + req.params.return_func + " = " + job_function);
+            } catch(err) {
+                return res.send(500, "Could not find/load the requested job.");
+            }
+        }
+    });
+    return next();
 });

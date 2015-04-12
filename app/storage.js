@@ -84,6 +84,7 @@ var Task = sequelize.define('task', {
     input_size: Sequelize.INTEGER,
     instance: Sequelize.INTEGER(4),
     sort: Sequelize.BOOLEAN,
+    completed: Sequelize.BOOLEAN
 });
 
 // Module relationships
