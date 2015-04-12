@@ -1,9 +1,11 @@
+var utils = require("../lib/utils.js")(conf);
+var commons = require("../lib/commons.js");
+var jobf = require('../lib/job.js');
+
 var server = module.parent.exports.server;
 var storage = module.parent.exports.storage;
 var conf = module.parent.exports.conf;
 var runtime = module.parent.exports.runtime;
-var utils = require("../lib/utils.js")(conf);
-var commons = require("../lib/commons.js");
 
 /**
  * Setup a cleanup task to do the following:
@@ -30,6 +32,47 @@ setInterval(function() {
             commons.removeClient(clients[i], runtime);
         }
     });
-    // DONE with inactive clients
+    // END with inactive clients
+    
+    // progress jobs to next steps
+    storage.Job.findAll({
+        where: {
+            completed: false,
+            paused: false,
+            error: null
+        }
+    }).then(function (jobs) {
+        if (!jobs)
+            return;
+        jobs.forEach(function (job) {
+            storage.Task.count({
+                where: {
+                    job_id: jobs[i].id,
+                    step: jobs[i].current_step,
+                    completed: false,
+                }
+            }).then(function (c) {
+                if (c == 0) {
+                    jobf.compactStep(job, conf).then(function (new_input_files) {
+                        var job_info = jobf.getJobInfo(job.id);
+                        if (job_info.chain.length > job.current_step + 1) {
+                            job.current_step += 1;
+                            job.save();
+                            jobf.addTasks(job_info, job, new_input_files,
+                                          storage, conf.get('default_split_size'));
+                        } else {
+                            jobf.finish(job);
+                        }
+                    })
+                    .error(function(err) {
+                        job_entry.error = err;
+                        job_entry.paused = true;
+                        job_entry.save();
+                    });
+                }
+            });
+        });  
+    });
+    // END progress jobs
 
 }, conf.get('cleanup_task_interval'));
