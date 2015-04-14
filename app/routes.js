@@ -1,5 +1,6 @@
 var fs = require('fs');
 var path = require('path');
+var UglifyJS = require('uglify-js')
 
 var commons = require('../lib/commons.js');
 var server = module.parent.exports.server;
@@ -191,8 +192,13 @@ server.get('/code', function codeGetHandler(req, res, next) {
             try {
                 job_info = require(job_file);
                 job_function = job_info.chain[parseInt(req.params.stage)].toString();
+                job_function = "var " + req.params.return_func + " = " + job_function;
                 res.contentType = 'application/javascript';
-                return res.send(200, "var " + req.params.return_func + " = " + job_function);
+                minified = UglifyJS.minify(job_function, {
+                    fromString: true,
+                    mangle: false
+                });
+                res.send(200, minified.code);
             } catch(err) {
                 return res.send(500, "Could not find/load the requested job.");
             }

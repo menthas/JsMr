@@ -2,7 +2,7 @@ var Sequelize = require('sequelize');
 var fs = require('fs');
 var syntax_check = require('syntax-error');
 
-var utils = require('../lib/utils.js')();
+var utils = require('../lib/utils.js');
 var jobf = require('../lib/job.js');
 var commons = require('../lib/commons.js');
 

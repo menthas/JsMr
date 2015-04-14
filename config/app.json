@@ -2,6 +2,7 @@
     "max_client_load": 10000000,
     "port": 8080,
     "debug": true,
+    "log_level": 4,
     "sqlite_storage": ":memory:",
     "cleanup_task_interval": 20000,
     "client_timeout": 65,
