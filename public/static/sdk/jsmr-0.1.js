@@ -99,7 +99,7 @@ var JsMr = Class.extend({
      *
      */
     upload_data: function () {
-
+	var _this = this; 
         var task = this.current_task;
         var job_id = task.job_id.toString();
         var task_id = task.task_id.toString();
@@ -124,16 +124,19 @@ var JsMr = Class.extend({
         s3.upload(output_params, function (err, data) {
             if (err)
                 console.log(err, err.stack); // an error occurred
-	    else
+	    else{
 		console.log("In output upload");
+                s3.upload(state_params, function (err, data) {
+                    if (err)
+                        console.log(err, err.stack); // an error occurred
+	            else{
+		        console.log("In state upload");
+                        _this.update_task(_this.current_task, "task_success");
+	            }
+                });
+	    }
         });
 
-        s3.upload(state_params, function (err, data) {
-            if (err)
-                console.log(err, err.stack); // an error occurred
-	    else
-		console.log("In state upload");
-        });
 	
 
     },
@@ -154,14 +157,14 @@ register: function (self) {
                 self.registered = true;
                 self.client_id = data.client_id;
 		try {
-                    var promise = self.runTask(data.task);
+                    self.runTask(data.task);
                 }catch(err) {
                     self.log("Error occured during running the task. "+err);
                     action = 'task_failure'
+                    self.update_task(data.task, action);
                 }
-                promise.then(self.update_task(data.task, action));
                 self.beat_interval_obj = setInterval(function () {
-                    self.beat();
+                   self.beat();
                 }, self.options.beat_interval);
                 self.log("Client Registered with id " + data.client_id);
             } else {
@@ -243,9 +246,8 @@ register: function (self) {
  * task success.
  */
 update_task: function (task, action) {
-    console.log("In update task before promise");
     var _this = this;
-    return new Promise ( function (){
+    console.log("In update task after promise");
     jQuery.post(
         _this.url('task'),
         {
@@ -258,21 +260,21 @@ update_task: function (task, action) {
     ).fail(function () {
             _this.log("Failed to update the task at " + _this.url('task'), true);
         });
- });
 },
 
 
 getData: function(task) {
 
-    console.log("In get data befoere get dat");
     var _this =this;
     console.log("In Get Data");
     var credentials = {accessKeyId: task.access_key, secretAccessKey: task.secret_key};
+
+
+
     AWS.config.update(credentials);
-    //AWS.config.region = 'us-west-2';
+    AWS.config.region = 'us-west-1';
     s3 = new AWS.S3();
     console.log("After AWS");
-    return new Promise( function () {
 
     //Fetch state from AWS
      var job_id = task.job_id.toString();
@@ -288,12 +290,14 @@ getData: function(task) {
         Range: 'bytes='.concat(task.start_index, '-', task.end_index)
     };
 
+
     s3.getObject(params, function (err, output_data) {
         if (err){
             console.log("Error in fetching data");
             console.log(err, err.stack); // an error occurred
         }
         else {
+            console.log("Success in fetching data");
             s3.getObject(state_params, function (err, data) {
                 if (err){
                     console.log("Error in fetching state");
@@ -302,6 +306,7 @@ getData: function(task) {
                 }
                 else {
                     // successful response
+                    console.log("Success in fetching state");
                     _this.current_state = JSON.parse( data.Body.toString());
                     console.log("Fetched state is: ");
                     console.log(_this.current_state);
@@ -310,11 +315,11 @@ getData: function(task) {
             });
         }
     });
-});
+
 },
 
 runAndUpload : function(data){
-
+    console.log("In run and upload");
     var output = "";
 
     var context = {
@@ -428,7 +433,6 @@ runAndUpload : function(data){
 	console.log("In run task");
         console.log(task);
         var _this = this;
-         return new Promise ( function () {
 	 if (task == null)
             return;
         if (!_this.registered) {
@@ -448,18 +452,16 @@ runAndUpload : function(data){
          }
 */         
         //var p = this.getCode();
- 	console.log("Returned promise");
-	_this.getCode().then( _this.getData(task) );
-    });
+	 _this.getCode()
+	 _this.getData(task);
+ 	 console.log("End of Run Task");
  },
 
     getCode: function () {
         var _this = this;
-	return new Promise( function () {
         var url = 'code?client_id='.concat(_this.client_id,'&job_id=',_this.current_task.job_id,'&step=',_this.current_task.step,'&return_func=runMap');
         _this.getScript(_this.url(url));
 	console.log("In get code");
-	});
         
     },
 
@@ -499,6 +501,12 @@ runAndUpload : function(data){
      */
     loadAndRegister: function () {
         var _this = this;
+
+        if (typeof AWS == 'undefined'){ 
+             console.log("Aws not defined");
+            _this.getScript(_this.aws_sdk);
+        }
+
         if (typeof jQuery == 'undefined') {
             _this.getScript(_this.options.jquery_cdn, _this.register);
         } else { // jQuery was already loaded
