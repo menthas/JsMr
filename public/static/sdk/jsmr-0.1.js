@@ -134,12 +134,50 @@ var JsMr = Class.extend({
 
     },
 
+
+register: function (self) {
+    console.log('auth_token in register' + self.options.auth_token);
+    jQuery.post(
+        self.url('register'),
+        {
+            auth_token: self.options.auth_token,
+            action: 'register',
+            agent: navigator.userAgent
+        },
+        function (data) {
+            var action = 'task_success'
+            if (data.registered == true) {
+                self.registered = true;
+                self.client_id = data.client_id;
+                try {
+                    self.runTask(data.task);
+                }catch(err)
+                {
+                    self.log("Error occured during running the task. "+err);
+                    action = 'task_failure'
+                }
+                self.update_task(data.task, action);
+                self.beat_interval_obj = setInterval(function () {
+                    self.beat();
+                }, self.options.beat_interval);
+                self.log("Client Registered with id " + data.client_id);
+            } else {
+                self.log("Server refused the registration request.");
+            }
+        }, 'json'
+    ).fail(function () {
+            self.log("Failed to contact server at " + self.url('register'), true);
+        });
+    self.serverCalled();
+},
+
+
     /**
      * Register a client with the server
      * @param  {Object} self A reference to the SDK object since register is
      *                  called from nested functions and reference to `this` is
      *                  lost
-     */
+     *
     register: function (self) {
         console.log('auth_token in register' + self.options.auth_token);
         jQuery.post(
@@ -167,6 +205,7 @@ var JsMr = Class.extend({
             });
         self.serverCalled();
     },
+    */
 
     /**
      * Unregister the client from the server and stop any activity by the SDK
@@ -195,6 +234,26 @@ var JsMr = Class.extend({
             }
         );
     },
+
+/**
+ * Update task in case of failure of tasks,
+ * task success.
+ */
+update_task: function (task, action) {
+    var _this = this;
+    jQuery.post(
+        this.url('task'),
+        {
+            task_id : task.task_id,
+            action: action
+        },
+        function (data) {
+            // TODO
+        }
+    ).fail(function () {
+            self.log("Failed to update the task at " + self.url('task'), true);
+        });
+},
 
     getData: function(task) {
 

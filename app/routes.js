@@ -111,8 +111,12 @@ server.get('/beat', function beatHandler(req, res, next) {
     return next();
 });
 
+
 /**
- * Task Updates
+ * Update the task in the following scenarios :
+ * a) Task is successfully finished by the client
+ * b) Run Task Failure by client.
+ * c) Client closed during task run.
  */
 server.post('/task', function taskPostHandler(req, res, next) {
     /**
@@ -130,7 +134,33 @@ server.post('/task', function taskPostHandler(req, res, next) {
      *         task: null|Task
      * }
      */
+    storage.Task.findOne({
+        where: {
+            id: req.params.task_id
+        }
+    }).then(function (task) {
+
+        if(req.params.action == 'task_success')
+        {
+            task.completed = true;
+        }
+        if(req.params.action == 'task_failure')
+        {
+            task.failed = task.failed + 1;
+        }
+        task.taken = 0;
+        task.save();
+        res.json({
+            task: null
+        });
+
+    });
+    return next();
 });
+
+
+
+
 
 /**
  * Get new task; used by an existing client that for some reason abandoned a task.
