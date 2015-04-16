@@ -324,7 +324,7 @@ runAndUpload : function(data){
 
     var context = {
         write: function (key, value) {
-            output = output.concat(key, ":", value, "\t");
+            output = output.concat(key, ":", value, "\n");
         },
         state: {}
     }
@@ -333,13 +333,14 @@ runAndUpload : function(data){
     var data_chunk;
     data_chunk = data.Body.toString();
     var split_data = data_chunk.split("\n");
-
-    runMap().setup(context);
+    
+    var runner = runMap();
+    runner.setup(context);
     //run code on each line of data
     for (var i = 0; i < split_data.length; i++) {
         var key = i + 1;
         var value = split_data[i];
-        runMap().run(key, value, context);
+        runner.run(key, value, context);
     }
     this.current_output = output;
     this.current_state = context.state;
