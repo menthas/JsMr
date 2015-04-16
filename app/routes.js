@@ -49,10 +49,8 @@ server.post('/register', function registerHandler(req, res, next) {
             tasks_done: 0,
             tasks_failed: 0,
             last_activity: new Date(),
-            prev_jobs: [],
         }).then(function (new_user) {
             job.schedule(new_user,storage,res);
-            console.log('Client created');
             next();
 
         });
@@ -139,6 +137,13 @@ server.post('/task', function taskPostHandler(req, res, next) {
             id: req.params.task_id
         }
     }).then(function (task) {
+
+        //update the instanceInfo map saying the task with
+        //this instance is free to be scheduled.
+        var key = task.job_id.concat('_',task.step);
+        var instances_id = job.instanceInfo[key];
+        instances_id.push(task.instance);
+        job.instanceInfo[key] = instances_id;
 
         if(req.params.action == 'task_success')
         {
