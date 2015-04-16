@@ -2,9 +2,11 @@ var fs = require('fs');
 var path = require('path');
 
 var commons = require('../lib/commons.js');
+var job = require('../lib/job.js');
 var server = module.parent.exports.server;
 var storage = module.parent.exports.storage;
 var runtime = module.parent.exports.runtime;
+var Sequelize = require('sequelize');
 
 /**
  * A task response is:
@@ -39,6 +41,7 @@ server.post('/register', function registerHandler(req, res, next) {
      * }
      */
     if (req.params.action == 'register') { // register client
+
         var new_client = storage.Client.create({
             auth_token: req.params.auth_token,
             busy: false,
@@ -46,17 +49,10 @@ server.post('/register', function registerHandler(req, res, next) {
             tasks_done: 0,
             tasks_failed: 0,
             last_activity: new Date(),
-            prev_jobs: [],
         }).then(function (new_user) {
-            res.json({
-                registered: true,
-                client_id: new_user.id,
-                task: null
-            });
-        }).catch(function (error) {
-            res.json({
-                registered: false,
-            });
+            job.schedule(new_user,storage,res);
+            next();
+
         });
     } else if (req.params.action == 'unregister') { // unregister client
         storage.Client.find(req.params.client_id).then(function (client) {
@@ -113,8 +109,12 @@ server.get('/beat', function beatHandler(req, res, next) {
     return next();
 });
 
+
 /**
- * Task Updates
+ * Update the task in the following scenarios :
+ * a) Task is successfully finished by the client
+ * b) Run Task Failure by client.
+ * c) Client closed during task run.
  */
 server.post('/task', function taskPostHandler(req, res, next) {
     /**
@@ -132,7 +132,40 @@ server.post('/task', function taskPostHandler(req, res, next) {
      *         task: null|Task
      * }
      */
+    storage.Task.findOne({
+        where: {
+            id: req.params.task_id
+        }
+    }).then(function (task) {
+
+        //update the instanceInfo map saying the task with
+        //this instance is free to be scheduled.
+        var key = task.job_id.concat('_',task.step);
+        var instances_id = job.instanceInfo[key];
+        instances_id.push(task.instance);
+        job.instanceInfo[key] = instances_id;
+
+        if(req.params.action == 'task_success')
+        {
+            task.completed = true;
+        }
+        if(req.params.action == 'task_failure')
+        {
+            task.failed = task.failed + 1;
+        }
+        task.taken = 0;
+        task.save();
+        res.json({
+            task: null
+        });
+
+    });
+    return next();
 });
+
+
+
+
 
 /**
  * Get new task; used by an existing client that for some reason abandoned a task.
@@ -179,7 +212,7 @@ server.get('/code', function codeGetHandler(req, res, next) {
      */
     storage.Client.find({
         where: {
-            auth_token: req.params.auth_token,
+            //auth_token: req.params.auth_token,
             id: req.params.client_id
         }
     }).then(function (client) {
@@ -190,7 +223,7 @@ server.get('/code', function codeGetHandler(req, res, next) {
         if (fs.existsSync(job_file)) {
             try {
                 job_info = require(job_file);
-                job_function = job_info.chain[parseInt(req.params.stage)].toString();
+                job_function = job_info.chain[parseInt(req.params.step)].toString();
                 res.contentType = 'application/javascript';
                 return res.send(200, "var " + req.params.return_func + " = " + job_function);
             } catch(err) {
