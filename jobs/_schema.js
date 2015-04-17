@@ -23,8 +23,7 @@ var m1 = function () {
      * @return {void}
      */
     this.setup = function (context) {
-        context.state.TotalCount = 0;
-
+        // stub
     };
 
     /**
@@ -38,16 +37,7 @@ var m1 = function () {
      * @return {void}
      */
     this.run = function (key, value, context) {
-        var line_split = value.split(' ');
-        var count = 0;
-        for(var i in line_split){
-            if(line_split[i] == 'is') {
-
-                context.state.TotalCount = context.state.TotalCount + 1;
-                count++;
-            }
-        }
-        context.write('is', count);
+        // stub
     };
 
     /**

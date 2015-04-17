@@ -66,9 +66,6 @@
     };
 })();
 
-
-var s3;
-
 var JsMr = Class.extend({
     init: function () {
 
@@ -82,6 +79,7 @@ var JsMr = Class.extend({
 
         this.beat_interval_obj = null;
         this.aws_sdk = 'https://sdk.amazonaws.com/js/aws-sdk-2.1.21.min.js';
+        this.s3 = null;
         this.options = {
             beat_interval: 60000, // one minute
             auth_token: null,
@@ -89,8 +87,10 @@ var JsMr = Class.extend({
             debug: true,
             jquery_cdn: 'https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js'
         };
-
-        this.getScript(this.aws_sdk);
+        this.requirements = {
+            jQuery: false,
+            AWS: false
+        }
         this.loadAndRegister();
     },
 
@@ -98,7 +98,7 @@ var JsMr = Class.extend({
      * Upload the output and state to AWS S3
      *
      */
-    upload_data: function () {
+    uploadData: function () {
         var _this = this;
         var task = this.current_task;
         var job_id = task.job_id.toString();
@@ -121,15 +121,15 @@ var JsMr = Class.extend({
         };
 
 
-        s3.upload(output_params, function (err, data) {
+        this.s3.upload(output_params, function (err, data) {
             if (err)
                 _this.log(err, err.stack); // an error occurred
             else {
-                s3.upload(state_params, function (err, data) {
+                _this.s3.upload(state_params, function (err, data) {
                     if (err)
                         _this.log(err, err.stack); // an error occurred
                     else {
-                        _this.update_task(_this.current_task, "task_success");
+                        _this.updateTast(_this.current_task, "task_success");
                     }
                 });
             }
@@ -140,6 +140,11 @@ var JsMr = Class.extend({
 
 
     register: function (self) {
+        all_loaded = true;
+        for (lib in self.requirements)
+            all_loaded = all_loaded && self.requirements[lib];
+        if (!all_loaded)
+            return;
         jQuery.post(
             self.url('register'),
             {
@@ -157,7 +162,7 @@ var JsMr = Class.extend({
                     } catch (err) {
                         self.log("Error occured during running the task. " + err);
                         action = 'task_failure'
-                        self.update_task(data.task, action);
+                        self.updateTast(data.task, action);
                     }
                     self.beat_interval_obj = setInterval(function () {
                         self.beat();
@@ -206,7 +211,7 @@ var JsMr = Class.extend({
      * Update task in case of failure of tasks,
      * task success.
      */
-    update_task: function (task, action) {
+    updateTast: function (task, action) {
         var _this = this;
         jQuery.post(
             _this.url('task'),
@@ -224,13 +229,12 @@ var JsMr = Class.extend({
 
 
     getData: function (task) {
-
         var _this = this;
         var credentials = {accessKeyId: task.access_key, secretAccessKey: task.secret_key};
 
         AWS.config.update(credentials);
         AWS.config.region = task.aws_region;
-        s3 = new AWS.S3();
+        this.s3 = new AWS.S3();
 
         //Fetch state from AWS
         var job_id = task.job_id.toString();
@@ -247,13 +251,13 @@ var JsMr = Class.extend({
         };
 
 
-        s3.getObject(params, function (err, output_data) {
+        this.s3.getObject(params, function (err, output_data) {
             if (err) {
                 _this.log("Error in fetching data");
                 _this.log(err, err.stack); // an error occurred
             }
             else {
-                s3.getObject(state_params, function (err, data) {
+                _this.s3.getObject(state_params, function (err, data) {
                     if (err) {
                         _this.log("Error in fetching state");
                         _this.log(err, err.stack); // an error occurred
@@ -288,7 +292,8 @@ var JsMr = Class.extend({
         var split_data = data_chunk.split("\n");
 
         var runner = runMap();
-        runner.setup(context);
+        if (typeof runner.setup == 'function')
+            runner.setup(context);
         //run code on each line of data
         for (var i = 0; i < split_data.length; i++) {
             var key = i + 1;
@@ -298,7 +303,7 @@ var JsMr = Class.extend({
         this.current_output = output;
         this.current_state = context.state;
         //upload data to s3
-        this.upload_data();
+        this.uploadData();
     },
 
 
@@ -374,18 +379,29 @@ var JsMr = Class.extend({
      * client with the server.
      */
     loadAndRegister: function () {
-        var _this = this;
-
+        var all_loaded = true;
         if (typeof AWS == 'undefined') {
-            _this.log("Aws not defined");
-            _this.getScript(_this.aws_sdk);
+            this.getScript(this.aws_sdk, function (self) {
+                self.requirements.AWS = true;
+                self.register(self);
+            });
+            all_loaded = false;
+        } else {
+            this.requirements.AWS = true;
         }
 
         if (typeof jQuery == 'undefined') {
-            _this.getScript(_this.options.jquery_cdn, _this.register);
-        } else { // jQuery was already loaded
-            _this.register();
+            this.getScript(this.options.jquery_cdn, function (self) {
+                self.requirements.jQuery = true;
+                self.register(self);
+            });
+            all_loaded = false;
+        } else {
+            this.requirements.jQuery = true;
         }
+
+        if (all_loaded)
+            this.register(this);
     },
 
     /**
