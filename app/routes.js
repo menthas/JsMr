@@ -1,8 +1,11 @@
 var fs = require('fs');
 var path = require('path');
 var UglifyJS = require('uglify-js')
+var Sequelize = require('sequelize');
 
 var commons = require('../lib/commons.js');
+var job = require('../lib/job.js');
+
 var server = module.parent.exports.server;
 var storage = module.parent.exports.storage;
 var runtime = module.parent.exports.runtime;
@@ -49,14 +52,9 @@ server.post('/register', function registerHandler(req, res, next) {
             last_activity: new Date(),
             prev_jobs: [],
         }).then(function (new_user) {
-            res.json({
+            job.schedule(new_user, storage, res, {
                 registered: true,
-                client_id: new_user.id,
-                task: null
-            });
-        }).catch(function (error) {
-            res.json({
-                registered: false,
+                client_id: new_user.id
             });
         });
     } else if (req.params.action == 'unregister') { // unregister client
@@ -103,10 +101,9 @@ server.get('/beat', function beatHandler(req, res, next) {
                 error_msg: 'Client not found'
             });
         } else {
-            res.json({
-                valid: true,
-                new_task: null
-            });
+            job.schedule(client, storage, res, {
+                valid: true
+            })
             client.last_activity = new Date();
             client.save();
         }
@@ -114,8 +111,12 @@ server.get('/beat', function beatHandler(req, res, next) {
     return next();
 });
 
+
 /**
- * Task Updates
+ * Update the task in the following scenarios :
+ * a) Task is successfully finished by the client
+ * b) Run Task Failure by client.
+ * c) Client closed during task run.
  */
 server.post('/task', function taskPostHandler(req, res, next) {
     /**
@@ -133,6 +134,39 @@ server.post('/task', function taskPostHandler(req, res, next) {
      *         task: null|Task
      * }
      */
+    var client_id = req.params.client_id,
+        auth_token = req.params.auth_token;
+    storage.Client.find({
+        where: {
+            id: client_id, auth_token: auth_token
+        }
+    }).then(function (client) {
+        storage.Task.findOne({
+            where: {
+                id: req.params.task_id
+            }
+        }).then(function (task) {
+            //update the instanceInfo map saying the task with
+            //this instance is free to be scheduled.
+            var key = task.job_id.concat('_',task.step);
+            var instances_id = job.instanceInfo[key];
+            instances_id.push(task.instance);
+            job.instanceInfo[key] = instances_id;
+
+            if(req.params.action == 'task_success')
+            {
+                task.completed = true;
+            }
+            if(req.params.action == 'task_failure')
+            {
+                task.failed = task.failed + 1;
+            }
+            task.taken = 0;
+            task.save();
+            job.schedule(client, storage, res);
+        });
+    });
+    return next();
 });
 
 /**
@@ -174,7 +208,7 @@ server.get('/code', function codeGetHandler(req, res, next) {
      * @param  {string}  auth_token
      * @param  {string}  client_id
      * @param  {string}  job_id
-     * @param  {integer} stage
+     * @param  {integer} step
      * @param  {string}  return_func
      * @return bulk of code to run
      */
@@ -191,7 +225,7 @@ server.get('/code', function codeGetHandler(req, res, next) {
         if (fs.existsSync(job_file)) {
             try {
                 job_info = require(job_file);
-                job_function = job_info.chain[parseInt(req.params.stage)].toString();
+                job_function = job_info.chain[parseInt(req.params.step)].toString();
                 job_function = "var " + req.params.return_func + " = " + job_function;
                 res.contentType = 'application/javascript';
                 minified = UglifyJS.minify(job_function, {
