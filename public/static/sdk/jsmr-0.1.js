@@ -228,13 +228,13 @@ var JsMr = Class.extend({
     },
 
 
-    getData: function (task) {
-        var _this = this;
+    getData: function (self) {
+        var task = self.current_task;
         var credentials = {accessKeyId: task.access_key, secretAccessKey: task.secret_key};
 
         AWS.config.update(credentials);
         AWS.config.region = task.aws_region;
-        this.s3 = new AWS.S3();
+        self.s3 = new AWS.S3();
 
         //Fetch state from AWS
         var job_id = task.job_id.toString();
@@ -250,30 +250,28 @@ var JsMr = Class.extend({
             Range: 'bytes='.concat(task.start_index, '-', task.end_index)
         };
 
-
-        this.s3.getObject(params, function (err, output_data) {
+        self.s3.getObject(params, function (err, output_data) {
             if (err) {
-                _this.log("Error in fetching data");
-                _this.log(err, err.stack); // an error occurred
+                self.log("Error in fetching data");
+                self.log(err, err.stack); // an error occurred
             }
             else {
-                _this.s3.getObject(state_params, function (err, data) {
+                self.s3.getObject(state_params, function (err, data) {
                     if (err) {
-                        _this.log("Error in fetching state");
-                        _this.log(err, err.stack); // an error occurred
-                        _this.runAndUpload(output_data);
+                        self.log("Error in fetching state");
+                        self.log(err, err.stack); // an error occurred
+                        self.runAndUpload(output_data);
                     }
                     else {
                         // successful response
-                        _this.current_state = JSON.parse(data.Body.toString());
-                        _this.log("Fetched state is: ");
-                        _this.log(_this.current_state);
-                        _this.runAndUpload(output_data);
+                        self.current_state = JSON.parse(data.Body.toString());
+                        self.log("Fetched state is: ");
+                        self.log(self.current_state);
+                        self.runAndUpload(output_data);
                     }
                 });
             }
         });
-
     },
 
     runAndUpload: function (data) {
@@ -313,17 +311,16 @@ var JsMr = Class.extend({
      * @param  {Object} task The task info
      */
     runTask: function (task) {
-        var _this = this;
         if (task == null)
             return;
-        if (!_this.registered) {
-            _this.log("Can't run Task `" + task.task_id + "`, client not registered", true);
+        if (!this.registered) {
+            this.log("Can't run Task `" + task.task_id + "`, client not registered", true);
         }
 
         // TODO In case of multiple tasks stop and cleanup the current task before starting a new one
         //cleanup this.current_task
         // Update current task with new one.
-        _this.current_task = task;
+        this.current_task = task;
 
         /*
          if(this.step_list.indexof(this.current_task.step) == -1)
@@ -333,15 +330,27 @@ var JsMr = Class.extend({
          }
          */
         //var p = this.getCode();
-        _this.getCode()
-        _this.getData(task);
+        
+        // This function does a bunch of stuff:
+        //  1. get's the code for this step
+        //  2. get's the data for this task
+        //  3. runs the task over the data
+        //  4. uploads the results to AWS and send the result to the server
+        this.getCode();
     },
 
     getCode: function () {
-        var _this = this;
-        var url = 'code?client_id='.concat(_this.client_id, '&job_id=', _this.current_task.job_id, '&step=', _this.current_task.step, '&return_func=runMap');
-        _this.getScript(_this.url(url));
-
+        var params = {
+            client_id: this.client_id,
+            auth_token: this.auth_token,
+            job_id: this.current_task.job_id,
+            step: this.current_task.step,
+            return_func: 'runMap',
+        }
+        this.getScript(
+            this.url('code?' + decodeURIComponent(jQuery.param(params))),
+            this.getData // get the data and run task after code is ready
+        );
     },
 
     /**
