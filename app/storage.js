@@ -13,7 +13,8 @@ var sequelize = new Sequelize(
         define: {
             underscored: true,
             paranoid: false
-        }
+        },
+        logging: false, // Because it prints every query !
     }
 );
 
@@ -38,7 +39,11 @@ var Client = sequelize.define('client', {
     last_activity: Sequelize.DATE,
     prev_jobs: {
         type: Sequelize.STRING,
+        allowNull: true,
+        defaultValue: null,
         get: function() {
+            if (!this.getDataValue('prev_jobs'))
+                return [];
             return JSON.parse(this.getDataValue('prev_jobs'));
         },
         set: function(val) {
