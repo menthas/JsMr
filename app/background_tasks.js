@@ -7,6 +7,9 @@ var storage = module.parent.exports.storage;
 var conf = module.parent.exports.conf;
 var runtime = module.parent.exports.runtime;
 
+var jobs_in_cleanup = [];
+module.exports.jobs_in_cleanup = jobs_in_cleanup;
+
 /**
  * Setup a cleanup task to do the following:
  *   1. Cleanup inactive clients and release their tasks
@@ -33,7 +36,7 @@ setInterval(function() {
                 storage.Task.find(clients[i].task_id).then(function (task) {
                     task.taken = 0;
                     task.client_id = null;
-                    if (task.instance != null) {
+                    if (task.instance != null && jobf.instanceInfo[inst_key]) {
                         var inst_key = task.job_id + "_" + task.step;
                         jobf.instanceInfo[inst_key].push(task.instance);
                     }
@@ -64,6 +67,10 @@ setInterval(function() {
                     completed: false,
                 }
             }).then(function (c) {
+                if (jobs_in_cleanup.indexOf(job.id) != -1)
+                    return; // This job is being cleaned up. don't start it again
+                jobs_in_cleanup.push(job.id); // lock for cleanup
+
                 var needs_cleanup = false;
                 var inst_key = job.id + "_" + job.current_step;
                 if (c == 0 && jobf.instanceInfo[inst_key]) { // job is done, call step.cleanup()
@@ -95,13 +102,20 @@ setInterval(function() {
                             utils.log(job.id + ": Compaction complete. finishing the job");
                             jobf.finish(job);
                         }
+                        // free up cleanup lock
+                        jobs_in_cleanup.splice(jobs_in_cleanup.indexOf(job.id), 1);
                     })
                     .catch(function(err) {
-                        utils.log(job.id + ": Compaction failed!", utils.ll.ERROR);
+                        utils.log(job.id + ": Compaction failed: " + err, utils.ll.ERROR);
                         job.error = JSON.stringify(err);
                         job.paused = true;
                         job.save();
+                        // free up cleanup lock
+                        jobs_in_cleanup.splice(jobs_in_cleanup.indexOf(job.id), 1);
                     });
+                } else {
+                    // free up cleanup lock
+                    jobs_in_cleanup.splice(jobs_in_cleanup.indexOf(job.id), 1);
                 }
             });
         });  
