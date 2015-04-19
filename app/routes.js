@@ -86,7 +86,7 @@ server.get('/beat', function beatHandler(req, res, next) {
      * @param  {string} job_id
      * @return {
      *         valid: true|false,
-     *         new_task: null|Task
+     *         task: null|Task
      * }
      */
     var client_id = req.params.client_id,
@@ -100,10 +100,23 @@ server.get('/beat', function beatHandler(req, res, next) {
             res.json(404, {
                 error_msg: 'Client not found'
             });
-        } else {
+        } else if (client.task_id == null) {
             job.schedule(client, storage, res, {
                 valid: true
             })
+            client.last_activity = new Date();
+            client.save();
+        } else {
+            storage.Task.find(client.task_id).then(function (task) {
+                if (!task || task.completed)
+                    res.json({
+                        valid: false
+                    });
+                else
+                    res.json({
+                        valid: true
+                    });
+            });
             client.last_activity = new Date();
             client.save();
         }
@@ -123,13 +136,7 @@ server.post('/task', function taskPostHandler(req, res, next) {
      * @param  {string}  auth_token
      * @param  {string}  client_id
      * @param  {string}  task_id
-     * @param  {string}  job_id
-     * @param  {int}     records_consumed
-     * @param  {boolean} success
-     * @param  {boolean} need_chunk
-     * @param  {list}    output
-     * @param  {Object}  state
-     * @param  {float}   elapsed_time
+     * @param  {string}  action     task_success|task_failure
      * @return {
      *         task: null|Task
      * }

@@ -29,6 +29,17 @@ setInterval(function() {
             return;
         utils.log("Found " + clients.length + " inactive clients. removing ...");
         for (var i=0; i<clients.length; i++) {
+            if (clients[i].task_id) {
+                storage.Task.find(clients[i].task_id).then(function (task) {
+                    task.taken = 0;
+                    task.client_id = null;
+                    if (task.instance != null) {
+                        var inst_key = task.job_id + "_" + task.step;
+                        jobf.instanceInfo[inst_key].push(task.instance);
+                    }
+                    task.save();
+                });
+            }
             commons.removeClient(clients[i], runtime);
         }
     });
@@ -44,34 +55,35 @@ setInterval(function() {
     }).then(function (jobs) {
         if (!jobs.length)
             return;
-        utils.log("BG Task: got " + jobs.count + " to check");
+        utils.log("BG Task: got " + jobs.length + " to check");
         jobs.forEach(function (job) {
             storage.Task.count({
                 where: {
-                    job_id: jobs[i].id,
-                    step: jobs[i].current_step,
+                    job_id: job.id,
+                    step: job.current_step,
                     completed: false,
                 }
             }).then(function (c) {
                 if (c == 0) {
                     utils.log("BG Task: job " + job.id + " needs to be progressed");
-                    jobf.compactStep(job, conf).then(function (new_input_files) {
-                        utils.log(job_entry.id + ": Compaction complete. Creating new tasks");
+                    jobf.compactStep(job, conf, storage).then(function (new_input_files) {
                         var job_info = jobf.getJobInfo(job.id);
                         if (job_info.chain.length > job.current_step + 1) {
+                            utils.log(job.id + ": Compaction complete. Creating new tasks");
                             job.current_step += 1;
                             job.save();
                             jobf.addTasks(job_info, job, new_input_files,
                                           storage, conf.get('default_split_size'));
                         } else {
+                            utils.log(job.id + ": Compaction complete. finishing the job");
                             jobf.finish(job);
                         }
                     })
-                    .error(function(err) {
+                    .catch(function(err) {
                         utils.log(job.id + ": Compaction failed!", utils.ll.ERROR);
-                        job_entry.error = err;
-                        job_entry.paused = true;
-                        job_entry.save();
+                        job.error = JSON.stringify(err);
+                        job.paused = true;
+                        job.save();
                     });
                 }
             });
