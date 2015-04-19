@@ -153,12 +153,21 @@ server.post('/task', function taskPostHandler(req, res, next) {
                 id: req.params.task_id
             }
         }).then(function (task) {
-            //update the instanceInfo map saying the task with
-            //this instance is free to be scheduled.
-            var key = task.job_id.concat('_',task.step);
-            var instances_id = job.instanceInfo[key];
-            instances_id.push(task.instance);
-            job.instanceInfo[key] = instances_id;
+            var input_file = task.input_file.split(":");
+            if (input_file[0] === 'CLEANUP') {
+                if (req.params.action == 'task_success') {
+                    // Delete the instance for this step
+                    var key = task.job_id.concat('_',task.step);
+                    delete job.instanceInfo[key];
+                }
+            } else {
+                //update the instanceInfo map saying the task with
+                //this instance is free to be scheduled.
+                var key = task.job_id.concat('_',task.step);
+                var instances_id = job.instanceInfo[key];
+                instances_id.push(task.instance);
+                job.instanceInfo[key] = instances_id;
+            }
 
             if(req.params.action == 'task_success')
             {

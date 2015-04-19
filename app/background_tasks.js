@@ -55,7 +55,7 @@ setInterval(function() {
     }).then(function (jobs) {
         if (!jobs.length)
             return;
-        utils.log("BG Task: got " + jobs.length + " to check");
+        utils.log("BG Task: got " + jobs.length + " job(s) to check");
         jobs.forEach(function (job) {
             storage.Task.count({
                 where: {
@@ -64,7 +64,24 @@ setInterval(function() {
                     completed: false,
                 }
             }).then(function (c) {
-                if (c == 0) {
+                var needs_cleanup = false;
+                var inst_key = job.id + "_" + job.current_step;
+                if (c == 0 && jobf.instanceInfo[inst_key]) { // job is done, call step.cleanup()
+                    utils.log("BG Task: job " + job.id + " step " + job.current_step +
+                        " complete, checking for step cleanup function");
+                    var info = jobf.getJobInfo(job.id);
+                    var step_func = info.chain[job.current_step]();
+                    if (typeof step_func.cleanup == 'function') {
+                        utils.log("BG Task: job " + job.id + " found cleanup function.");
+                        jobf.addCleanupTask(job, storage);
+                        needs_cleanup = true;
+                    } else {
+                        utils.log("BG Task: job " + job.id + " not found, job will be progressed " +
+                            "on next background cleanup.");
+                        delete jobf.instanceInfo[inst_key];
+                    }
+                }
+                if (c == 0 && !needs_cleanup) {
                     utils.log("BG Task: job " + job.id + " needs to be progressed");
                     jobf.compactStep(job, conf, storage).then(function (new_input_files) {
                         var job_info = jobf.getJobInfo(job.id);

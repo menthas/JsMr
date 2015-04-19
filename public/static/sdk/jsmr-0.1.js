@@ -103,35 +103,57 @@ var JsMr = Class.extend({
         var task = this.current_task;
         var job_id = task.job_id.toString();
         var task_id = task.task_id.toString();
-        var state = JSON.stringify(this.current_state);
 
-        var output_params = {
-            Bucket: task.bucket_name, /* required */
-            Key: job_id.concat('/_temp/', task.task_id),
-            Body: this.current_output
-        };
+        var output_params = null;
+        if (this.current_output) {
+            var output_params = {
+                Bucket: task.bucket_name, /* required */
+                Key: job_id.concat('/_temp/', task.task_id),
+                Body: this.current_output
+            };
+        }
 
-        var state_params = {
-            Bucket: task.bucket_name, /* required */
-            Key: job_id.concat('/_temp/states/', task.step, '_', task.instance_id),
-            Body: state
-        };
-
-        this.s3.upload(output_params, function (err, data) {
-            if (err)
-                _this.log(err, err.stack); // an error occurred
-            else {
-                _this.s3.upload(state_params, function (err, data) {
-                    if (err)
-                        _this.log(err, err.stack); // an error occurred
-                    else {
-                        _this.updateTast(_this.current_task, "task_success");
-                    }
-                });
+        // only upload state if object and non-empty
+        var state_params = null;
+        if (this.current_state && typeof this.current_state == 'object') {
+            var not_empty = false;
+            for (item in this.current_state) {
+                not_empty = true;
+                break;
             }
-        });
+            if (not_empty) {
+                var state_params = {
+                    Bucket: task.bucket_name, /* required */
+                    Key: job_id.concat('/_temp/states/', task.step, '_', task.instance_id),
+                    Body: JSON.stringify(this.current_state)
+                };
+            }
+        }
 
-
+        if (output_params) {
+            this.s3.upload(output_params, function (err, data) {
+                if (err)
+                    _this.log(err, err.stack); // an error occurred
+                else if (state_params) {
+                    _this.s3.upload(state_params, function (err, data) {
+                        if (err)
+                            _this.log(err, err.stack); // an error occurred
+                        else {
+                            _this.updateTast(_this.current_task, "task_success");
+                        }
+                    });
+                } else
+                    _this.updateTast(_this.current_task, "task_success");
+            });
+        } else if (state_params) {
+            this.s3.upload(state_params, function (err, data) {
+                if (err)
+                    _this.log(err, err.stack); // an error occurred
+                else {
+                    _this.updateTast(_this.current_task, "task_success");
+                }
+            });
+        }
     },
 
 
@@ -231,7 +253,6 @@ var JsMr = Class.extend({
         this.serverCalled();
     },
 
-
     getData: function (self) {
         var task = self.current_task;
         var credentials = {accessKeyId: task.access_key, secretAccessKey: task.secret_key};
@@ -239,6 +260,10 @@ var JsMr = Class.extend({
         AWS.config.update(credentials);
         AWS.config.region = task.aws_region;
         self.s3 = new AWS.S3();
+
+        // Go over special cases, currently only cleanup tasks
+        if (task.special === 'cleanup')
+            return self.runSpecialCleanup(task);
 
         //Fetch state from AWS
         var job_id = task.job_id.toString();
@@ -278,6 +303,49 @@ var JsMr = Class.extend({
                 self.runAndUpload(output_data.Body.toString());
             });
         });
+    },
+
+    runSpecialCleanup: function(task) {
+        var _this = this;
+        this.s3.listObjects({
+            Bucket: task.bucket_name,
+            Prefix: task.job_id + '/_temp/states'
+        }, function (err, data) {
+            var total_instances = data.Contents.length;
+            var states = [];
+            data.Contents.forEach(function (content) {
+                _this.s3.getObject({
+                    Bucket: task.bucket_name,
+                    Key: content.Key,
+                }, function (state_err, state_data) {
+                    if (state_err && state_err.statusCode != 404) {
+                        return this.log("Failed to load state on " + content);
+                        // TODO tell server task failed
+                    } else if (!state_err) {
+                        states.push(JSON.parse(state_data.Body.toString()));
+                    }
+                    total_instances--;
+                    if (total_instances == 0) { // all states are here, run
+                        _this.runAndUploadStates(states);
+                    }
+                });
+            });
+        });
+    },
+
+    runAndUploadStates: function(states) {
+        var output = "";
+        var context = {
+            write: function (key, value) {
+                output = output.concat(key, ":", value, "\n");
+            }
+        }
+        var runner = runMap();
+        runner.cleanup(states, context);
+        this.current_output = output;
+        this.current_state = null;
+        //upload data to s3
+        this.uploadData();
     },
 
     runAndUpload: function (data) {
