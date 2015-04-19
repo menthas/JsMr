@@ -82,7 +82,7 @@ var JsMr = Class.extend({
         this.s3 = null;
         this.options = {
             beat_interval: 60000, // one minute
-            auth_token: null,
+            auth_token: '',
             server_path: '',
             debug: true,
             jquery_cdn: 'https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js'
@@ -103,39 +103,57 @@ var JsMr = Class.extend({
         var task = this.current_task;
         var job_id = task.job_id.toString();
         var task_id = task.task_id.toString();
-        var state = JSON.stringify(this.current_state);
 
-        this.log('Output is' + this.current_output);
-        this.log('State is' + state);
+        var output_params = null;
+        if (this.current_output) {
+            var output_params = {
+                Bucket: task.bucket_name, /* required */
+                Key: job_id.concat('/_temp/', task.task_id),
+                Body: this.current_output
+            };
+        }
 
-        var output_params = {
-            Bucket: task.bucket_name, /* required */
-            Key: job_id.concat('_', task.task_id),
-            Body: this.current_output
-        };
-
-        var state_params = {
-            Bucket: task.bucket_name, /* required */
-            Key: job_id.concat('_', task.step, '_', task.instance_id),
-            Body: state
-        };
-
-
-        this.s3.upload(output_params, function (err, data) {
-            if (err)
-                _this.log(err, err.stack); // an error occurred
-            else {
-                _this.s3.upload(state_params, function (err, data) {
-                    if (err)
-                        _this.log(err, err.stack); // an error occurred
-                    else {
-                        _this.updateTast(_this.current_task, "task_success");
-                    }
-                });
+        // only upload state if object and non-empty
+        var state_params = null;
+        if (this.current_state && typeof this.current_state == 'object') {
+            var not_empty = false;
+            for (item in this.current_state) {
+                not_empty = true;
+                break;
             }
-        });
+            if (not_empty) {
+                var state_params = {
+                    Bucket: task.bucket_name, /* required */
+                    Key: job_id.concat('/_temp/states/', task.step, '_', task.instance_id),
+                    Body: JSON.stringify(this.current_state)
+                };
+            }
+        }
 
-
+        if (output_params) {
+            this.s3.upload(output_params, function (err, data) {
+                if (err)
+                    _this.log(err, err.stack); // an error occurred
+                else if (state_params) {
+                    _this.s3.upload(state_params, function (err, data) {
+                        if (err)
+                            _this.log(err, err.stack); // an error occurred
+                        else {
+                            _this.updateTast(_this.current_task, "task_success");
+                        }
+                    });
+                } else
+                    _this.updateTast(_this.current_task, "task_success");
+            });
+        } else if (state_params) {
+            this.s3.upload(state_params, function (err, data) {
+                if (err)
+                    _this.log(err, err.stack); // an error occurred
+                else {
+                    _this.updateTast(_this.current_task, "task_success");
+                }
+            });
+        }
     },
 
 
@@ -153,7 +171,6 @@ var JsMr = Class.extend({
                 agent: navigator.userAgent
             },
             function (data) {
-                var action = 'task_success'
                 if (data.registered == true) {
                     self.registered = true;
                     self.client_id = data.client_id;
@@ -161,8 +178,7 @@ var JsMr = Class.extend({
                         self.runTask(data.task);
                     } catch (err) {
                         self.log("Error occured during running the task. " + err);
-                        action = 'task_failure'
-                        self.updateTast(data.task, action);
+                        self.updateTast(data.task, 'task_failure');
                     }
                     self.beat_interval_obj = setInterval(function () {
                         self.beat();
@@ -173,8 +189,8 @@ var JsMr = Class.extend({
                 }
             }, 'json'
         ).fail(function () {
-                self.log("Failed to contact server at " + self.url('register'), true);
-            });
+            self.log("Failed to contact server at " + self.url('register'), true);
+        });
         self.serverCalled();
     },
 
@@ -214,33 +230,46 @@ var JsMr = Class.extend({
     updateTast: function (task, action) {
         var _this = this;
         jQuery.post(
-            _this.url('task'),
+            this.url('task'),
             {
+                client_id: this.client_id,
+                auth_token: this.options.auth_token,
                 task_id: task.task_id,
                 action: action
             },
             function (data) {
-                // TODO
+                if (data.task)
+                    _this.log("Got a new task (on update)");
+                try {
+                    _this.runTask(data.task);
+                } catch (err) {
+                    _this.log("Error occured during running the task. " + err);
+                    _this.updateTast(data.task, 'task_failure');
+                }
             }
         ).fail(function () {
-                _this.log("Failed to update the task at " + _this.url('task'), true);
-            });
+            _this.log("Failed to update the task at " + _this.url('task'), true);
+        });
+        this.serverCalled();
     },
 
-
-    getData: function (task) {
-        var _this = this;
+    getData: function (self) {
+        var task = self.current_task;
         var credentials = {accessKeyId: task.access_key, secretAccessKey: task.secret_key};
 
         AWS.config.update(credentials);
         AWS.config.region = task.aws_region;
-        this.s3 = new AWS.S3();
+        self.s3 = new AWS.S3();
+
+        // Go over special cases, currently only cleanup tasks
+        if (task.special === 'cleanup')
+            return self.runSpecialCleanup(task);
 
         //Fetch state from AWS
         var job_id = task.job_id.toString();
         var state_params = {
             Bucket: task.bucket_name,
-            Key: job_id.concat('_', task.step, '_', task.instance_id),
+            Key: job_id.concat('/_temp/states/', task.step, '_', task.instance_id),
         }
 
         //Fetch data from AWS
@@ -250,30 +279,73 @@ var JsMr = Class.extend({
             Range: 'bytes='.concat(task.start_index, '-', task.end_index)
         };
 
-
-        this.s3.getObject(params, function (err, output_data) {
+        self.s3.getObject(params, function (err, output_data) {
             if (err) {
-                _this.log("Error in fetching data");
-                _this.log(err, err.stack); // an error occurred
+                self.log("Error in fetching data");
+                self.log(err, err.stack); // an error occurred
+                // TODO tell server task failed
+                return;
             }
-            else {
-                _this.s3.getObject(state_params, function (err, data) {
-                    if (err) {
-                        _this.log("Error in fetching state");
-                        _this.log(err, err.stack); // an error occurred
-                        _this.runAndUpload(output_data);
+            self.s3.getObject(state_params, function (err, data) {
+                if (err && err.statusCode != 404) {
+                    self.log("Error in fetching state");
+                    self.log(err, err.stack); // an error occurred
+                    // TODO tell server task failed
+                    return;
+                } else if (err) { // this is the first job, use empty state
+                    self.log("First job, using clean state");
+                    self.current_state = {};
+                } else { // successful response
+                    self.current_state = JSON.parse(data.Body.toString());
+                    self.log("Fetched state is: " + data.Body.toString());
+                }
+                
+                self.runAndUpload(output_data.Body.toString());
+            });
+        });
+    },
+
+    runSpecialCleanup: function(task) {
+        var _this = this;
+        this.s3.listObjects({
+            Bucket: task.bucket_name,
+            Prefix: task.job_id + '/_temp/states'
+        }, function (err, data) {
+            var total_instances = data.Contents.length;
+            var states = [];
+            data.Contents.forEach(function (content) {
+                _this.s3.getObject({
+                    Bucket: task.bucket_name,
+                    Key: content.Key,
+                }, function (state_err, state_data) {
+                    if (state_err && state_err.statusCode != 404) {
+                        return this.log("Failed to load state on " + content);
+                        // TODO tell server task failed
+                    } else if (!state_err) {
+                        states.push(JSON.parse(state_data.Body.toString()));
                     }
-                    else {
-                        // successful response
-                        _this.current_state = JSON.parse(data.Body.toString());
-                        _this.log("Fetched state is: ");
-                        _this.log(_this.current_state);
-                        _this.runAndUpload(output_data);
+                    total_instances--;
+                    if (total_instances == 0) { // all states are here, run
+                        _this.runAndUploadStates(states);
                     }
                 });
-            }
+            });
         });
+    },
 
+    runAndUploadStates: function(states) {
+        var output = "";
+        var context = {
+            write: function (key, value) {
+                output = output.concat(key, ":", value, "\n");
+            }
+        }
+        var runner = runMap();
+        runner.cleanup(states, context);
+        this.current_output = output;
+        this.current_state = null;
+        //upload data to s3
+        this.uploadData();
     },
 
     runAndUpload: function (data) {
@@ -283,13 +355,9 @@ var JsMr = Class.extend({
             write: function (key, value) {
                 output = output.concat(key, ":", value, "\n");
             },
-            state: {}
+            state: this.current_state
         }
-        context.state = this.current_state;
-
-        var data_chunk;
-        data_chunk = data.Body.toString();
-        var split_data = data_chunk.split("\n");
+        var split_data = data.split("\n");
 
         var runner = runMap();
         if (typeof runner.setup == 'function')
@@ -313,17 +381,16 @@ var JsMr = Class.extend({
      * @param  {Object} task The task info
      */
     runTask: function (task) {
-        var _this = this;
         if (task == null)
             return;
-        if (!_this.registered) {
-            _this.log("Can't run Task `" + task.task_id + "`, client not registered", true);
+        if (!this.registered) {
+            this.log("Can't run Task `" + task.task_id + "`, client not registered", true);
         }
 
         // TODO In case of multiple tasks stop and cleanup the current task before starting a new one
         //cleanup this.current_task
         // Update current task with new one.
-        _this.current_task = task;
+        this.current_task = task;
 
         /*
          if(this.step_list.indexof(this.current_task.step) == -1)
@@ -333,15 +400,28 @@ var JsMr = Class.extend({
          }
          */
         //var p = this.getCode();
-        _this.getCode()
-        _this.getData(task);
+        
+        // This function does a bunch of stuff:
+        //  1. get's the code for this step
+        //  2. get's the data for this task
+        //  3. runs the task over the data
+        //  4. uploads the results to AWS and send the result to the server
+        this.getCode();
     },
 
     getCode: function () {
-        var _this = this;
-        var url = 'code?client_id='.concat(_this.client_id, '&job_id=', _this.current_task.job_id, '&step=', _this.current_task.step, '&return_func=runMap');
-        _this.getScript(_this.url(url));
-
+        var params = {
+            client_id: this.client_id,
+            auth_token: this.options.auth_token,
+            job_id: this.current_task.job_id,
+            step: this.current_task.step,
+            return_func: 'runMap',
+        }
+        this.getScript(
+            this.url('code?' + decodeURIComponent(jQuery.param(params))),
+            this.getData // get the data and run task after code is ready
+        );
+        this.serverCalled();
     },
 
     /**
@@ -363,14 +443,19 @@ var JsMr = Class.extend({
                 job_id: this.current_task ? this.current_task.job_id : null
             },
             function (data) {
-                if (data.valid != true) {
-                    _this.runTask(data.new_task);
-                }
                 _this.log("Heartbeat ❤")
+                if (data.task)
+                    _this.log("Got a new task (on heartbeat)");
+                try {
+                    _this.runTask(data.task);
+                } catch (err) {
+                    _this.log("Error occured during running the task. " + err);
+                    _this.updateTast(data.task, 'task_failure');
+                }
             }, 'json'
         ).fail(function () {
-                _this.log("Failed to sent heartbeat to " + _this.url('beat'), true);
-            });
+            _this.log("Failed to sent heartbeat to " + _this.url('beat'), true);
+        });
     },
 
     /**

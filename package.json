@@ -24,6 +24,8 @@
     "mv": "~2.0.3",
     "syntax-error": "~1.1.2",
     "aws-sdk": "~2.1.22",
-    "bluebird": "~2.9.24"
+    "bluebird": "~2.9.24",
+    "uglify-js": "~2.4.20",
+    "dateformat": "~1.0.11"
   }
 }

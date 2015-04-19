@@ -13,7 +13,8 @@ var sequelize = new Sequelize(
         define: {
             underscored: true,
             paranoid: false
-        }
+        },
+        logging: false, // Because it prints every query !
     }
 );
 

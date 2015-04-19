@@ -47,7 +47,7 @@ module.exports.server = server;
 module.exports.storage = require('./app/storage.js');
 
 // Cleanup the server's state
-var utils = require('./lib/utils.js')();
+var utils = require('./lib/utils.js');
 utils.cleanup(module.exports.storage);
 
 // Load routes
