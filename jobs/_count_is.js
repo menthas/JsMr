@@ -4,7 +4,8 @@ var m1 = function () {
     this.instances = 5;
 
     this.setup = function (context) {
-        context.state.TotalCount = 0;
+        if (context.state.TotalCount === undefined)
+            context.state.TotalCount = 0;
     };
 
     this.run = function (key, value, context) {
