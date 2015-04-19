@@ -16,7 +16,7 @@ var server = restify.createServer({
     name: 'JsMr',
     formatters: {
         'application/javascript': function(req, res, body) {
-            return body;
+            return body+"";
         }
     }
 });
