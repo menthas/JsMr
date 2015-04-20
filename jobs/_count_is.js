@@ -31,12 +31,26 @@ var m1 = function () {
     return this;
 }
 
+var r1 = function () {
+    this.is_reduce = true;
+    this.instances = -1;
+
+    this.run = function (key, values, context) {
+        var total = 0;
+        for (var i=0; i<values.length; i++)
+            total += parseInt(values[i]);
+        context.write('final-'+key, total);
+    }
+
+    return this;
+}
+
 /**
  * Must be set to the job description
  * @type {Object}
  */
 module.exports = {
-    chain: [m1],
+    chain: [m1, r1],
     input: {
         type: 'AWS', // or AWS
         bucket: 'bucket_name',

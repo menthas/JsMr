@@ -7,5 +7,5 @@
     "cleanup_task_interval": 20000,
     "client_timeout": 65,
     "default_split_size": 65536,
-    "server_split_size": 5000000
+    "shuffle_mem_limit": 100000000
 }

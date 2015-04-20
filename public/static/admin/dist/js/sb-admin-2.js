@@ -60,6 +60,7 @@ $(function() {
                     data.error = "Job created successfuly. Check the status above.";
                 }
                 $('#new_job_console').html(data.error);
+                load_page(current_section);
             }
         });
     })

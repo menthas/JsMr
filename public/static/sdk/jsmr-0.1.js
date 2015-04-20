@@ -262,8 +262,10 @@ var JsMr = Class.extend({
         self.s3 = new AWS.S3();
 
         // Go over special cases, currently only cleanup tasks
-        if (task.special === 'cleanup')
+        if (task.special === 'cleanup') {
+            self.log("Received a cleanup task, getting states and running.");
             return self.runSpecialCleanup(task);
+        }
 
         //Fetch state from AWS
         var job_id = task.job_id.toString();
@@ -326,6 +328,7 @@ var JsMr = Class.extend({
                     }
                     total_instances--;
                     if (total_instances == 0) { // all states are here, run
+                        _this.log("Cleanup: All states fetched, running");
                         _this.runAndUploadStates(states);
                     }
                 });
