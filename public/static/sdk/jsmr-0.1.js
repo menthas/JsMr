@@ -66,6 +66,8 @@
     };
 })();
 
+var offset_bytes = 40;
+
 var JsMr = Class.extend({
     init: function () {
 
@@ -267,6 +269,26 @@ var JsMr = Class.extend({
             return self.runSpecialCleanup(task);
         }
 
+        var params = {
+            Bucket: task.bucket_name,
+            Key: task.object_key,
+            Range: 0
+        };
+
+        //do not fetch the previous data since it is first task
+        if (task.start_index == 0) {
+            self.fetchDataAndStateFromAws(params, "");
+        }
+        else {
+            self.fetchMissingData(task.start_index - offset_bytes, task.start_index, params);
+        }
+
+    },
+
+    fetchDataAndStateFromAws: function (params, missing_line) {
+        var self = this;
+        var task = self.current_task;
+
         //Fetch state from AWS
         var job_id = task.job_id.toString();
         var state_params = {
@@ -274,13 +296,7 @@ var JsMr = Class.extend({
             Key: job_id.concat('/_temp/states/', task.step, '_', task.instance_id),
         }
 
-        //Fetch data from AWS
-        var params = {
-            Bucket: task.bucket_name,
-            Key: task.object_key,
-            Range: 'bytes='.concat(task.start_index, '-', task.end_index)
-        };
-
+        params.Range = 'bytes='.concat(task.start_index, '-', task.end_index);
         self.s3.getObject(params, function (err, output_data) {
             if (err) {
                 self.log("Error in fetching data");
@@ -288,6 +304,7 @@ var JsMr = Class.extend({
                 // TODO tell server task failed
                 return;
             }
+            var final_data_ = missing_line.concat(output_data.Body.toString());
             self.s3.getObject(state_params, function (err, data) {
                 if (err && err.statusCode != 404) {
                     self.log("Error in fetching state");
@@ -301,10 +318,43 @@ var JsMr = Class.extend({
                     self.current_state = JSON.parse(data.Body.toString());
                     self.log("Fetched state is: " + data.Body.toString());
                 }
-                
-                self.runAndUpload(output_data.Body.toString());
+
+                self.runAndUpload(final_data_);
             });
+
         });
+
+    },
+
+    fetchMissingData: function (start_index, end_index, params) {
+        var self = this;
+        var found_data = false;
+        params.Range = 'bytes='.concat(start_index, '-', end_index);
+        var missing_line = "";
+        //Fetch missing data from AWS
+        self.s3.getObject(params, function (err, missing_data) {
+            if (err) {
+                self.log("Error in fetching missing data");
+                self.log(err, err.stack); // an error occurred
+                // TODO tell server task failed
+                return;
+            }
+            //check if the discarded line from previous task is fetched
+            //completely.
+            var data = missing_data.Body.toString();
+            for (var i = data.length - 1; i >= 0; i--) {
+                if (data[i] == "\n") {
+                    missing_line = data.substring(i + 1, data.length - 1);
+                    found_data = true;
+                    break;
+                }
+            }
+            if (!found_data) {
+                return self.fetchMissingData(start_index - offset_bytes, end_index, params);
+            }
+            self.fetchDataAndStateFromAws(params, missing_line);
+        });
+
     },
 
     runSpecialCleanup: function(task) {
@@ -365,8 +415,8 @@ var JsMr = Class.extend({
         var runner = runMap();
         if (typeof runner.setup == 'function')
             runner.setup(context);
-        //run code on each line of data
-        for (var i = 0; i < split_data.length; i++) {
+        //run code on each line of data and discard the last line
+        for (var i = 0; i < split_data.length - 1; i++) {
             var key = i + 1;
             var value = split_data[i];
             runner.run(key, value, context);
