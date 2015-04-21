@@ -66,8 +66,6 @@
     };
 })();
 
-var offset_bytes = 40;
-
 var JsMr = Class.extend({
     init: function () {
 
@@ -86,6 +84,7 @@ var JsMr = Class.extend({
             auth_token: '',
             server_path: '',
             debug: true,
+            offset_bytes: 200,
             jquery_cdn: 'https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js'
         };
         this.requirements = {
@@ -291,7 +290,10 @@ var JsMr = Class.extend({
             self.fetchDataAndStateFromAws(params, "");
         }
         else {
-            self.fetchMissingData(task.start_index - offset_bytes, task.start_index, params);
+            self.fetchMissingData(
+                task.start_index - self.options.offset_bytes,
+                task.start_index, params
+            );
         }
 
     },
@@ -375,7 +377,9 @@ var JsMr = Class.extend({
                 }
             }
             if (!found_data) {
-                return self.fetchMissingData(start_index - offset_bytes, end_index, params);
+                return self.fetchMissingData(
+                    start_index - self.options.offset_bytes, end_index, params
+                );
             }
             self.fetchDataAndStateFromAws(params, missing_line);
         });

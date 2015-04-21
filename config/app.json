@@ -6,6 +6,6 @@
     "sqlite_storage": ":memory:",
     "cleanup_task_interval": 5000,
     "client_timeout": 30,
-    "default_split_size": 65536,
+    "default_split_size": 1048576,
     "shuffle_mem_limit": 100000000
 }
