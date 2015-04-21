@@ -77,13 +77,12 @@ var JsMr = Class.extend({
         this.current_task = null;
         this.current_output = "";
         this.current_state = {};
-        this.step_list = [];
 
         this.beat_interval_obj = null;
         this.aws_sdk = 'https://sdk.amazonaws.com/js/aws-sdk-2.1.21.min.js';
         this.s3 = null;
         this.options = {
-            beat_interval: 60000, // one minute
+            beat_interval: 30000, // 30sec
             auth_token: '',
             server_path: '',
             debug: true,
@@ -240,6 +239,9 @@ var JsMr = Class.extend({
                 action: action
             },
             function (data) {
+                this.current_state = {};
+                this.current_task = null;
+                this.current_output = "";
                 if (data.task)
                     _this.log("Got a new task (on update)");
                 try {
@@ -411,16 +413,28 @@ var JsMr = Class.extend({
             state: this.current_state
         }
         var split_data = data.split("\n");
+        if (!split_data[split_data.length-1])
+            split_data.pop(); // remove the extra \n from the end
 
         var runner = runMap();
         if (typeof runner.setup == 'function')
             runner.setup(context);
-        //run code on each line of data and discard the last line
-        for (var i = 0; i < split_data.length - 1; i++) {
-            var key = i + 1;
-            var value = split_data[i];
-            runner.run(key, value, context);
+
+        if (runner.is_reduce) {
+            // in case of reduce feed all the data at once
+            runner.run(this.current_task.task_key, split_data, context);
+        } else {
+            //run code on each line of data and discard the last line
+            for (var i = 0; i < split_data.length - 1; i++) {
+                var key = i + 1;
+                var value = split_data[i];
+                runner.run(key, value, context);
+            }
         }
+
+        if (typeof runner.breakdown == 'function')
+            runner.breakdown(context);
+
         this.current_output = output;
         this.current_state = context.state;
         //upload data to s3
@@ -441,40 +455,42 @@ var JsMr = Class.extend({
         }
 
         // TODO In case of multiple tasks stop and cleanup the current task before starting a new one
-        //cleanup this.current_task
+        // cleanup this.current_task
         // Update current task with new one.
+        var need_code = !this.current_task ||
+                        this.current_task.job_id != task.job_id ||
+                        this.current_task.step != task.step;
         this.current_task = task;
 
-        /*
-         if(this.step_list.indexof(this.current_task.step) == -1)
-         {
-         this.step_list.push(this.current_task.step);
-         this.getCode();
-         }
-         */
-        //var p = this.getCode();
-        
         // This function does a bunch of stuff:
-        //  1. get's the code for this step
+        //  1. get's the code for this step (if not the same as prev)
         //  2. get's the data for this task
         //  3. runs the task over the data
         //  4. uploads the results to AWS and send the result to the server
-        this.getCode();
+        this.getCode(need_code);
     },
 
-    getCode: function () {
-        var params = {
-            client_id: this.client_id,
-            auth_token: this.options.auth_token,
-            job_id: this.current_task.job_id,
-            step: this.current_task.step,
-            return_func: 'runMap',
+    /**
+     * Get the code required for this task if we haven't loaded it before.
+     * @param  {boolean} need_code flag to indicate download
+     */
+    getCode: function (need_code) {
+        if (need_code) {
+            var params = {
+                client_id: this.client_id,
+                auth_token: this.options.auth_token,
+                job_id: this.current_task.job_id,
+                step: this.current_task.step,
+                return_func: 'runMap',
+            }
+            this.getScript(
+                this.url('code?' + decodeURIComponent(jQuery.param(params))),
+                this.getData // get the data and run task after code is ready
+            );
+            this.serverCalled();
+        } else {
+            this.getData(this);
         }
-        this.getScript(
-            this.url('code?' + decodeURIComponent(jQuery.param(params))),
-            this.getData // get the data and run task after code is ready
-        );
-        this.serverCalled();
     },
 
     /**
@@ -506,8 +522,17 @@ var JsMr = Class.extend({
                     _this.updateTast(data.task, 'task_failure');
                 }
             }, 'json'
-        ).fail(function () {
-            _this.log("Failed to sent heartbeat to " + _this.url('beat'), true);
+        ).fail(function (jqXHR) {
+            if (jqXHR.status == 404) {
+                _this.log("Client was dropped by server. registering again.", true);
+                _this.registered = false;
+                _this.client_id = null;
+                this.last_call = 0;
+                clearInterval(_this.beat_interval_obj);
+                _this.register(_this);
+            } else {
+                _this.log("Failed to sent heartbeat to " + _this.url('beat'), true);
+            }
         });
     },
 

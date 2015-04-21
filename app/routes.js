@@ -16,6 +16,7 @@ var runtime = module.parent.exports.runtime;
  *  + stage
  *  + job_id
  *  + task_id
+ *  + task_key
  *  + start_index
  *  + end_index
  *  + bucket_name
@@ -109,8 +110,8 @@ server.get('/beat', function beatHandler(req, res, next) {
         } else {
             storage.Task.find(client.task_id).then(function (task) {
                 if (!task || task.completed)
-                    res.json({
-                        valid: false
+                    job.schedule(client, storage, res, {
+                        valid: false,
                     });
                 else
                     res.json({
@@ -148,6 +149,13 @@ server.post('/task', function taskPostHandler(req, res, next) {
             id: client_id, auth_token: auth_token
         }
     }).then(function (client) {
+        if (!client)
+            return res.json({
+                task: null
+            });
+        client.last_activity = new Date();
+        client.save();
+
         storage.Task.findOne({
             where: {
                 id: req.params.task_id
