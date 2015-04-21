@@ -36,8 +36,8 @@ setInterval(function() {
                 storage.Task.find(clients[i].task_id).then(function (task) {
                     task.taken = 0;
                     task.client_id = null;
+                    var inst_key = task.job_id + "_" + task.step;
                     if (task.instance != null && jobf.instanceInfo[inst_key]) {
-                        var inst_key = task.job_id + "_" + task.step;
                         jobf.instanceInfo[inst_key].push(task.instance);
                     }
                     task.save();
@@ -89,9 +89,9 @@ setInterval(function() {
                     }
                 }
                 if (c == 0 && !needs_cleanup) {
+                    var job_info = jobf.getJobInfo(job.id);
                     utils.log("BG Task: job " + job.id + " needs to be progressed");
-                    jobf.compactStep(job, conf, storage).then(function (new_input_files) {
-                        var job_info = jobf.getJobInfo(job.id);
+                    jobf.compactStep(job, job_info, conf, storage).then(function (new_input_files) {
                         if (job_info.chain.length > job.current_step + 1) {
                             utils.log(job.id + ": Compaction complete. Creating new tasks");
                             job.current_step += 1;

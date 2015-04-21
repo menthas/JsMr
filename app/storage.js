@@ -88,7 +88,7 @@ var Task = sequelize.define('task', {
     input_offset: Sequelize.STRING,
     input_size: Sequelize.INTEGER,
     instance: Sequelize.INTEGER(4),
-    sort: Sequelize.BOOLEAN,
+    key: Sequelize.STRING, // in case of reducer will hold the key
     completed: Sequelize.BOOLEAN
 });
 

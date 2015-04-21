@@ -41,6 +41,16 @@ var m1 = function () {
     };
 
     /**
+     * Called after run() is called on a complete chunk. a good place to compact
+     * and cleanup state for trasfer or emit any aggregated output.
+     * @param  {Object} context context of this step
+     * @return {void}
+     */
+    this.breakdown = function (context) {
+        // stub
+    }
+
+    /**
      * called once for this step, gets the state of all instances.
      * WARNING: Never use variables from the outer scopes in this method, instead
      *          use context.state to store any information.

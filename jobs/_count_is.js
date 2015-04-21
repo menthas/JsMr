@@ -3,30 +3,36 @@ var m1 = function () {
 
     this.instances = 5;
 
-    this.setup = function (context) {
-        if (context.state.TotalCount === undefined)
-            context.state.TotalCount = 0;
-    };
-
     this.run = function (key, value, context) {
         var line_split = value.split(' ');
         var count = 0;
         for(var i in line_split){
-            if(line_split[i] == 'is') {
-                context.state.TotalCount++;
-                count++;
-            }
+            context.write(line_split[i], 1);
         }
-        context.write('is', count);
     };
 
-    this.cleanup = function (states, context) {
-        var total = 0;
-        for (var i=0; i<states.length; i++) {
-            total += states[i].TotalCount;
-        }
-        context.write("total", total);
+    return this;
+}
+
+var r1 = function () {
+    this.is_reduce = true;
+    this.instances = -1;
+
+    this.setup = function (context) {
+        if (!context.state.TotalCount)
+            context.state.TotalCount = 0;
     };
+
+    this.run = function (key, values, context) {
+        context.state.key = key;
+        for (var i=0; i<values.length; i++)
+            context.state.TotalCount += parseInt(values[i]);
+    }
+
+    this.cleanup = function (states, context) {
+        for (var i=0; i<states.length; i++)
+            context.write(states[i].key, states[i].TotalCount);
+    }
 
     return this;
 }
@@ -36,7 +42,7 @@ var m1 = function () {
  * @type {Object}
  */
 module.exports = {
-    chain: [m1],
+    chain: [m1, r1],
     input: {
         type: 'AWS', // or AWS
         bucket: 'bucket_name',
