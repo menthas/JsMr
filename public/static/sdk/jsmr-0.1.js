@@ -140,24 +140,28 @@ var JsMr = Class.extend({
                         if (err)
                             _this.log(err, err.stack); // an error occurred
                         else {
-                            _this.updateTast(_this.current_task, "task_success");
+                            _this.updateTask(_this.current_task, "task_success");
                         }
                     });
                 } else
-                    _this.updateTast(_this.current_task, "task_success");
+                    _this.updateTask(_this.current_task, "task_success");
             });
         } else if (state_params) {
             this.s3.upload(state_params, function (err, data) {
                 if (err)
                     _this.log(err, err.stack); // an error occurred
                 else {
-                    _this.updateTast(_this.current_task, "task_success");
+                    _this.updateTask(_this.current_task, "task_success");
                 }
             });
         }
     },
 
-
+    /**
+     * Register this client with the server (and runs the first task if any)
+     * @param  {object} self reference to this class.
+     * @return {void}
+     */
     register: function (self) {
         all_loaded = true;
         for (lib in self.requirements)
@@ -179,7 +183,7 @@ var JsMr = Class.extend({
                         self.runTask(data.task);
                     } catch (err) {
                         self.log("Error occured during running the task. " + err);
-                        self.updateTast(data.task, 'task_failure');
+                        self.updateTask(data.task, 'task_failure');
                     }
                     self.beat_interval_obj = setInterval(function () {
                         self.beat();
@@ -225,10 +229,10 @@ var JsMr = Class.extend({
     },
 
     /**
-     * Update task in case of failure of tasks,
-     * task success.
+     * Report the task status to the server and run any consecutive task
+     * returned by the server
      */
-    updateTast: function (task, action) {
+    updateTask: function (task, action) {
         var _this = this;
         jQuery.post(
             this.url('task'),
@@ -248,7 +252,7 @@ var JsMr = Class.extend({
                     _this.runTask(data.task);
                 } catch (err) {
                     _this.log("Error occured during running the task. " + err);
-                    _this.updateTast(data.task, 'task_failure');
+                    _this.updateTask(data.task, 'task_failure');
                 }
             }
         ).fail(function () {
@@ -257,6 +261,11 @@ var JsMr = Class.extend({
         this.serverCalled();
     },
 
+    /**
+     * Get the data for the task at hand and run the code on it.
+     * @param  {object} self reference to this class.
+     * @return {void}
+     */
     getData: function (self) {
         var task = self.current_task;
         var credentials = {accessKeyId: task.access_key, secretAccessKey: task.secret_key};
@@ -287,6 +296,12 @@ var JsMr = Class.extend({
 
     },
 
+    /**
+     * Fetch the data from AWS and run the task
+     * @param  {object} params       Parameters of the AWS split
+     * @param  {string} missing_line The line from the prev. split.
+     * @return {void}
+     */
     fetchDataAndStateFromAws: function (params, missing_line) {
         var self = this;
         var task = self.current_task;
@@ -328,6 +343,14 @@ var JsMr = Class.extend({
 
     },
 
+    /**
+     * If the split size breaks a line, fetch the missing line and runs the
+     * job on the complete split.
+     * @param  {integer} start_index index where the line starts before
+     * @param  {integer} end_index   end of the split
+     * @param  {object}  params      AWS S3 parameters
+     * @return {void}
+     */
     fetchMissingData: function (start_index, end_index, params) {
         var self = this;
         var found_data = false;
@@ -359,6 +382,12 @@ var JsMr = Class.extend({
 
     },
 
+    /**
+     * Run a cleanup task which gets all the states from AWS and runs them on
+     * a client.
+     * @param  {object} task current task
+     * @return {void}
+     */
     runSpecialCleanup: function(task) {
         var _this = this;
         this.s3.listObjects({
@@ -388,6 +417,11 @@ var JsMr = Class.extend({
         });
     },
 
+    /**
+     * Run the cleanup task on all states and upload the result.
+     * @param  {list} states list of all the states from different instances
+     * @return {void}
+     */
     runAndUploadStates: function(states) {
         var output = "";
         var context = {
@@ -403,6 +437,11 @@ var JsMr = Class.extend({
         this.uploadData();
     },
 
+    /**
+     * Run an upload a map or reduce job.
+     * @param  {string} data split data for this task
+     * @return {void}
+     */
     runAndUpload: function (data) {
         var output = "";
 
@@ -519,7 +558,7 @@ var JsMr = Class.extend({
                     _this.runTask(data.task);
                 } catch (err) {
                     _this.log("Error occured during running the task. " + err);
-                    _this.updateTast(data.task, 'task_failure');
+                    _this.updateTask(data.task, 'task_failure');
                 }
             }, 'json'
         ).fail(function (jqXHR) {
@@ -590,6 +629,12 @@ var JsMr = Class.extend({
         }
     },
 
+    /**
+     * download and runs a remote script and calls "success" when done.
+     * @param  {string}  url      Script URL
+     * @param  {function} success function to be called on success
+     * @return {void}
+     */
     getScript: function (url, success) {
         var _this = this;
         var script = document.createElement('script');
