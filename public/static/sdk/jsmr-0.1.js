@@ -82,7 +82,7 @@ var JsMr = Class.extend({
         this.aws_sdk = 'https://sdk.amazonaws.com/js/aws-sdk-2.1.21.min.js';
         this.s3 = null;
         this.options = {
-            beat_interval: 30000, // 30sec
+            beat_interval: 10000, // in milli seconds
             auth_token: '',
             server_path: '',
             debug: true,

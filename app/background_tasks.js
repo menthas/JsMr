@@ -36,8 +36,8 @@ setInterval(function() {
                 storage.Task.find(clients[i].task_id).then(function (task) {
                     task.taken = 0;
                     task.client_id = null;
+                    var inst_key = task.job_id + "_" + task.step;
                     if (task.instance != null && jobf.instanceInfo[inst_key]) {
-                        var inst_key = task.job_id + "_" + task.step;
                         jobf.instanceInfo[inst_key].push(task.instance);
                     }
                     task.save();

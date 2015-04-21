@@ -149,13 +149,6 @@ server.post('/task', function taskPostHandler(req, res, next) {
             id: client_id, auth_token: auth_token
         }
     }).then(function (client) {
-        if (!client)
-            return res.json({
-                task: null
-            });
-        client.last_activity = new Date();
-        client.save();
-
         storage.Task.findOne({
             where: {
                 id: req.params.task_id
@@ -172,22 +165,24 @@ server.post('/task', function taskPostHandler(req, res, next) {
                 //update the instanceInfo map saying the task with
                 //this instance is free to be scheduled.
                 var key = task.job_id.concat('_',task.step);
-                var instances_id = job.instanceInfo[key];
-                instances_id.push(task.instance);
-                job.instanceInfo[key] = instances_id;
+                job.instanceInfo[key].push(task.instance);
             }
 
             if(req.params.action == 'task_success')
-            {
                 task.completed = true;
-            }
-            if(req.params.action == 'task_failure')
-            {
+            else if(req.params.action == 'task_failure')
                 task.failed = task.failed + 1;
-            }
             task.taken = 0;
             task.save();
-            job.schedule(client, storage, res);
+
+            if (client) {
+                client.last_activity = new Date();
+                client.save();
+                job.schedule(client, storage, res);
+            } else
+                res.json({
+                    task:null,
+                });
         });
     });
     return next();
