@@ -80,7 +80,7 @@ var JsMr = Class.extend({
         this.aws_sdk = 'https://sdk.amazonaws.com/js/aws-sdk-2.1.21.min.js';
         this.s3 = null;
         this.options = {
-            beat_interval: 10000, // in milli seconds
+            beat_interval: 5000, // in milli seconds
             auth_token: '',
             server_path: '',
             debug: true,
@@ -491,7 +491,7 @@ var JsMr = Class.extend({
      * @param  {Object} task The task info
      */
     runTask: function (task) {
-        if (task == null)
+        if (!task)
             return;
         if (!this.registered) {
             this.log("Can't run Task `" + task.task_id + "`, client not registered", true);

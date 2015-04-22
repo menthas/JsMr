@@ -98,12 +98,15 @@ setInterval(function() {
                             job.save();
                             jobf.addTasks(job_info, job, new_input_files,
                                           storage, conf.get('default_split_size'));
+                            // free up cleanup lock
+                            jobs_in_cleanup.splice(jobs_in_cleanup.indexOf(job.id), 1);
                         } else {
                             utils.log(job.id + ": Compaction complete. finishing the job");
-                            jobf.finish(job);
+                            jobf.finish(job).then(function () {
+                                // free up cleanup lock
+                                jobs_in_cleanup.splice(jobs_in_cleanup.indexOf(job.id), 1);
+                            });
                         }
-                        // free up cleanup lock
-                        jobs_in_cleanup.splice(jobs_in_cleanup.indexOf(job.id), 1);
                     })
                     .catch(function(err) {
                         utils.log(job.id + ": Compaction failed: " + err, utils.ll.ERROR);
